@@ -1,20 +1,22 @@
+use std::io::{self, BufWriter, Write};
+
+use anyhow::Context;
+
 use crate::bitqueue::BitQueue;
 
 /// This structure represents a bit-writer.
-#[derive(Default)]
-pub struct BitWriter {
-    buffer: BitQueue
+pub struct BitWriter<W: Write> {
+    buffer: BitQueue,
+    writer: BufWriter<W>,
 }
 
-impl BitWriter {
+impl<W: Write> BitWriter<W> {
     /// Creates a new bit-writer.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Creates a new bit-writer with underlying buffer with specified capacity.
-    pub fn with_capacity(capacity: usize) -> Self {
-        BitWriter { buffer: BitQueue::with_capacity(capacity) }
+    pub fn new(writer: W) -> Self {
+        BitWriter {
+            buffer: BitQueue::new(),
+            writer: BufWriter::new(writer),
+        }
     }
 
     /// Writes the bits of a given value in a most-significant-bit-first (MSB-first)
@@ -26,25 +28,52 @@ impl BitWriter {
     /// # Examples
     ///
     /// ```
+    /// use std::io::Cursor;
     /// use idencode::io::BitWriter;
     ///
-    /// let mut bw = BitWriter::default();
-    /// let bits = vec![true, true, false, true, false, false, false, false];
+    /// let writer = Cursor::new(vec![]);
+    /// let mut bw = BitWriter::new(writer);
+    /// let bits = vec![true, true, false];
     /// for bit in bits {
-    ///     bw.write_bit(bit);
+    ///     bw.write_bit(bit).unwrap();
     /// }
     ///
-    /// assert_eq!(*bw.get_ref(), [0b11010000]);
+    /// assert_eq!(*bw.get_ref(), [0b110]);
     /// ```
-    pub fn write_bit(&mut self, bit: bool) {
+    pub fn write_bit(&mut self, bit: bool) -> io::Result<()> {
         self.buffer.push(bit);
+        if *self.buffer.bit_position() == 0 && !self.buffer.is_empty() {
+            let byte = *self
+                .buffer
+                .as_slice()
+                .get(0)
+                .expect("It is guaranteed that at least one byte exists.");
+            self.buffer.clear();
+            self.writer.write(&[byte])?;
+        }
+        Ok(())
     }
 
-    /// Pushes bits from an iterator.
-    pub fn write_bits(&mut self, bits: &[bool]) {
+    /// Pushes bits from a slice.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::io::Cursor;
+    /// use idencode::io::BitWriter;
+    ///
+    /// let writer = Cursor::new(vec![]);
+    /// let mut bw = BitWriter::new(writer);
+    /// bw.write_bits(&[true, true, false, true, false, false, false, false]).unwrap();
+    ///
+    /// let result = bw.finalize().unwrap().into_inner();
+    /// assert_eq!(result, [0b11010000]);
+    /// ```
+    pub fn write_bits(&mut self, bits: &[bool]) -> io::Result<()> {
         for bit in bits {
-            self.write_bit(*bit);
+            self.write_bit(*bit)?;
         }
+        Ok(())
     }
 
     /// Acquires a shared reference to the underlying buffer.
@@ -86,37 +115,42 @@ impl BitWriter {
     /// # Example
     ///
     /// ```
+    /// use std::io::Cursor;
     /// use idencode::io::BitWriter;
     ///
-    /// let mut bw = BitWriter::default();
-    /// bw.write_bit(true);
-    /// bw.write_bit(false);
-    /// let result = bw.finalize();
+    /// let writer = Cursor::new(vec![]);
+    /// let mut bw = BitWriter::new(writer);
+    /// bw.write_bit(true).unwrap();
+    /// bw.write_bit(false).unwrap();
+    /// let result = bw.finalize().unwrap();
     /// // The final buffer will contain a single byte, with `10` (binary) padded from the
     /// // left to become `000000010`.
-    /// assert_eq!(result, vec![0b00000010]);
+    /// assert_eq!(result.into_inner(), vec![0b00000010]);
     /// ```
-    pub fn finalize(mut self) -> Vec<u8> {
-        self.buffer.as_slice()
-            .iter()
-            .copied()
-            .collect::<Vec<_>>()
+    pub fn finalize(mut self) -> anyhow::Result<W> {
+        self.writer.write_all(self.buffer.as_slice()).context("")?;
+        self.writer.flush().context("")?;
+        self.writer
+            .into_inner()
+            .map_err(|_| anyhow::anyhow!("Failed to recover inner writer."))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Cursor;
 
     #[test]
     fn test_push_bits() {
-        let mut bw = BitWriter::default();
+        let writer = Cursor::new(vec![]);
+        let mut bw = BitWriter::new(writer);
         let bits = vec![
-            false, false, false, false, false, false, true, true,
-            false, false, false, false, false, false, false, true,
-            false, true, false,
+            false, false, false, false, false, false, true, true, false, false, false, false,
+            false, false, false, true, false, true, false,
         ];
-        bw.write_bits(&bits);
-        assert_eq!(bw.finalize(), vec![3, 1, 2])
+        bw.write_bits(&bits).unwrap();
+        let result = bw.finalize().unwrap();
+        assert_eq!(result.into_inner(), vec![3, 1, 2])
     }
 }

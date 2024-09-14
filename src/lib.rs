@@ -1,6 +1,6 @@
 pub mod error;
-pub mod util;
 pub mod global;
+pub mod util;
 pub mod bitqueue;
 pub mod io;
 

@@ -4,6 +4,12 @@ pub struct BitQueue {
     bit_pos: u8,
 }
 
+impl From<Vec<u8>> for BitQueue {
+    fn from(v: Vec<u8>) -> BitQueue {
+        BitQueue { inner: v, bit_pos: 0 }
+    }
+}
+
 impl BitQueue {
     /// Creates a new bit-queue.
     pub fn new() -> Self {
@@ -37,12 +43,50 @@ impl BitQueue {
         if self.bit_pos == 0 {
             self.inner.push(0)
         }
-        let mut byte = self.inner.last_mut()
+        let byte = self.inner.last_mut()
             .expect("It is guaranteed that at least one byte exists.");
         let bit = bit as u8;
         *byte <<= 1;
         *byte |= bit;
         self.bit_pos = (self.bit_pos + 1) % 8;
+    }
+
+    /// Extends bit-queue from a slice of bits.
+    ///
+    /// Traverses the slice of bits in-order and sequentially pushes the bits
+    /// in the bit-queue.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use idencode::bitqueue::BitQueue;
+    ///
+    /// let mut bq = BitQueue::new();
+    /// let bits = &[true, true, false, true, true, false, true, true, true, false];
+    /// bq.extend(bits);
+    ///
+    /// assert_eq!(bq.as_slice(), &[0b11011011, 0b10]);
+    /// ```
+    pub fn extend(&mut self, bits: &[bool]) {
+        for bit in bits {
+            self.push(*bit);
+        }
+    }
+
+    /// Returns the current bit position.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use idencode::bitqueue::BitQueue;
+    ///
+    /// let mut bq = BitQueue::new();
+    /// bq.extend(&[true, false]);
+    ///
+    /// assert_eq!(*bq.bit_position(), 2);
+    /// ```
+    pub fn bit_position(&self) -> &u8 {
+        &self.bit_pos
     }
 
     /// Returns the number of bits in the bit-queue.

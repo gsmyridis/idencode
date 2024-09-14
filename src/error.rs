@@ -1,3 +1,4 @@
+
 /// Creates an error with the provided name and error message.
 macro_rules! create_error {
     ($name:ident, $msg:expr) => {

@@ -1,19 +1,20 @@
+use std::io::{self, Write};
+
 use super::unary::UnaryEncoder;
 use crate::error::InvalidGammaCode;
 use crate::util::bits_to_number;
 use crate::io::BitWriter;
 
-#[derive(Default)]
-pub struct GammaEncoder {
-    writer: BitWriter,
+pub struct GammaEncoder<W: Write> {
+    writer: BitWriter<W>,
 }
 
-impl GammaEncoder {
-    pub fn new() -> Self {
-        Self::default()
+impl<W: Write> GammaEncoder<W> {
+    pub fn new(writer: W) -> Self {
+        GammaEncoder{ writer: BitWriter::new(writer) }
     }
 
-    pub fn write(&mut self, nums: &[u32]) {
+    pub fn write(&mut self, nums: &[u32]) -> io::Result<()> {
         // We reuse a single vector to store the offset bits for each number in `nums`.
         // For each number, we clear the vector, calculate the offset bits, and store
         // them in the vector. This approach avoids redundant heap allocations by reusing
@@ -42,14 +43,15 @@ impl GammaEncoder {
             let len_bits = UnaryEncoder::encode(len);
 
             // Write length and offset bits in bit-writer.
-            self.writer.write_bits(len_bits.as_slice());
-            self.writer.write_bits(offset_bits.as_slice());
+            self.writer.write_bits(len_bits.as_slice())?;
+            self.writer.write_bits(offset_bits.as_slice())?;
         }
+        Ok(())
     }
 
     /// Consumes the encoder and finalizes the encoding, returning the
     /// underlying buffer.
-    pub fn finalize(self) -> Vec<u8> {
+    pub fn finalize(self) -> anyhow::Result<W> {
         self.writer.finalize()
     }
 }
@@ -58,7 +60,7 @@ pub struct GammaDecoder;
 
 impl GammaDecoder {
     /// Decode a Gamma encoded stream of bits.
-    fn decode_bits(bits: &[bool]) -> Result<Vec<u32>, InvalidGammaCode> {
+    pub fn decode_bits(bits: &[bool]) -> Result<Vec<u32>, InvalidGammaCode> {
         let mut nums = vec![];
         let mut bits = bits;
 
@@ -100,36 +102,47 @@ impl GammaDecoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Cursor;
 
     #[test]
     fn test_encode_1() {
         // Example 1
-        let mut ge = GammaEncoder::new();
-        ge.write(&[2]);
-        assert_eq!(ge.finalize(), vec![4]);
+        let writer = Cursor::new(vec![]);
+        let mut ge = GammaEncoder::new(writer);
+        ge.write(&[0b10]).unwrap();
+        let result = ge.finalize().unwrap().into_inner();
+        assert_eq!(result, vec![0b100]);
 
         // Example 2
-        let mut ge = GammaEncoder::new();
-        ge.write(&[3]);
-        assert_eq!(ge.finalize(), vec![5]);
+        let writer = Cursor::new(vec![]);
+        let mut ge = GammaEncoder::new(writer);
+        ge.write(&[3]).unwrap();
+        let result = ge.finalize().unwrap().into_inner();
+        assert_eq!(result, vec![5]);
 
         // Example 3
-        let mut ge = GammaEncoder::new();
-        ge.write(&[9]);
-        assert_eq!(ge.finalize(), vec![113]);
+        let writer = Cursor::new(vec![]);
+        let mut ge = GammaEncoder::new(writer);
+        ge.write(&[9]).unwrap();
+        let result = ge.finalize().unwrap().into_inner();
+        assert_eq!(result, vec![113]);
     }
 
     #[test]
     fn test_encode_2() {
         // Example 1
-        let mut ge = GammaEncoder::new();
-        ge.write(&[2, 3]);
-        assert_eq!(ge.finalize(), vec![37]);
+        let writer = Cursor::new(vec![]);
+        let mut ge = GammaEncoder::new(writer);
+        ge.write(&[2, 3]).unwrap();
+        let result = ge.finalize().unwrap().into_inner();
+        assert_eq!(result, vec![37]);
 
         // Example 2
-        let mut ge = GammaEncoder::new();
-        ge.write(&[2, 3, 9]);
-        assert_eq!(ge.finalize(), vec![151, 17]);
+        let writer = Cursor::new(vec![]);
+        let mut ge = GammaEncoder::new(writer);
+        ge.write(&[2, 3, 9]).unwrap();
+        let result = ge.finalize().unwrap().into_inner();
+        assert_eq!(result, vec![151, 17]);
     }
 
     #[test]
