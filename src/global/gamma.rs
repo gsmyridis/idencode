@@ -1,7 +1,7 @@
 use super::unary::UnaryEncoder;
 use crate::error::InvalidGammaCode;
 use crate::util::bits_to_number;
-use crate::write::BitWriter;
+use crate::io::BitWriter;
 
 #[derive(Default)]
 pub struct GammaEncoder {

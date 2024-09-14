@@ -1,52 +1,43 @@
+use crate::bitqueue::BitQueue;
+
 /// This structure represents a bit-writer.
 #[derive(Default)]
 pub struct BitWriter {
-    buffer: Vec<u8>,
-    current_byte: u8,
-    bit_position: u8,
+    buffer: BitQueue
 }
 
 impl BitWriter {
-    /// Creates a new bit-writer with underlying buffer with specified capacity.
-    pub fn with_capacity(capacity: usize) -> Self {
-        BitWriter {
-            buffer: Vec::with_capacity(capacity),
-            current_byte: 0,
-            bit_position: 0,
-        }
+    /// Creates a new bit-writer.
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Writes the bits of a given value in a most-significant-bit-first (MSB-first) order.
+    /// Creates a new bit-writer with underlying buffer with specified capacity.
+    pub fn with_capacity(capacity: usize) -> Self {
+        BitWriter { buffer: BitQueue::with_capacity(capacity) }
+    }
+
+    /// Writes the bits of a given value in a most-significant-bit-first (MSB-first)
+    /// order.
     ///
-    /// The first bit written is the most significant bit of the value, followed by the next
-    /// most significant bit, down to the least significant bit.
+    /// The first bit written is the most significant bit of the value, followed by
+    /// the next most significant bit, down to the least significant bit.
     ///
     /// # Examples
     ///
     /// ```
-    /// use idencode::write::BitWriter;
+    /// use idencode::io::BitWriter;
     ///
     /// let mut bw = BitWriter::default();
-    /// bw.write_bit(true);
-    /// bw.write_bit(true);
-    /// bw.write_bit(false);
-    /// bw.write_bit(true);
-    /// bw.write_bit(false);
-    /// bw.write_bit(false);
-    /// bw.write_bit(false);
-    /// bw.write_bit(false);
+    /// let bits = vec![true, true, false, true, false, false, false, false];
+    /// for bit in bits {
+    ///     bw.write_bit(bit);
+    /// }
     ///
     /// assert_eq!(*bw.get_ref(), [0b11010000]);
     /// ```
     pub fn write_bit(&mut self, bit: bool) {
-        let bit = bit as u8;
-        self.current_byte |= bit << (7 - self.bit_position);
-        self.bit_position += 1;
-        if self.bit_position == 8 {
-            self.buffer.push(self.current_byte);
-            self.current_byte = 0;
-            self.bit_position = 0;
-        }
+        self.buffer.push(bit);
     }
 
     /// Pushes bits from an iterator.
@@ -77,9 +68,7 @@ impl BitWriter {
     /// Resets the state of this bit-writer entirely, cleaning the underlying
     /// buffer, and resets the current byte and current bit's position.
     pub fn reset(&mut self) {
-        self.buffer.clear();
-        self.current_byte = 0;
-        self.bit_position = 0;
+        self.buffer.clear()
     }
 
     /// Consumes the bit-writer and finalizes the writing, returning the
@@ -97,7 +86,7 @@ impl BitWriter {
     /// # Example
     ///
     /// ```
-    /// use idencode::write::BitWriter;
+    /// use idencode::io::BitWriter;
     ///
     /// let mut bw = BitWriter::default();
     /// bw.write_bit(true);
@@ -108,11 +97,10 @@ impl BitWriter {
     /// assert_eq!(result, vec![0b00000010]);
     /// ```
     pub fn finalize(mut self) -> Vec<u8> {
-        if self.bit_position > 0 {
-            self.current_byte >>= 8 - self.bit_position;
-            self.buffer.push(self.current_byte);
-        }
-        self.buffer
+        self.buffer.as_slice()
+            .iter()
+            .copied()
+            .collect::<Vec<_>>()
     }
 }
 
