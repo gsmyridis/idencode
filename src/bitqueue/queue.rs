@@ -90,7 +90,7 @@ impl BitQueue {
     }
 
     /// Returns the number of bits in the bit-queue.
-    pub fn n_bits(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.inner.len() * 8
     }
 
@@ -101,7 +101,7 @@ impl BitQueue {
 
     /// Returns `true` if the bit-queue contains no bits.
     pub fn is_empty(&self) -> bool {
-        self.n_bytes() == 0
+        self.inner.len() == 0
     }
 
     /// Clears the bit-queue, removing all bits.

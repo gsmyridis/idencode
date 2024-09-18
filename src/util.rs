@@ -1,14 +1,3 @@
-use super::error::InvalidBitError;
-
-/// Turns a bit to a boolean. 1 maps to true, and 0 maps to false.
-pub(crate) fn bit_to_bool(b: u8) -> Result<bool, InvalidBitError> {
-    match b {
-        0 => Ok(false),
-        1 => Ok(true),
-        _ => Err(InvalidBitError),
-    }
-}
-
 /// Converts a vector of boolean values representing bits (in most significant to
 /// least significant order) into its corresponding decimal (integer) representation.
 ///
@@ -25,23 +14,19 @@ pub(crate) fn bits_to_number(bits: &[bool]) -> u32 {
     result
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_bit_to_bool() {
-        assert_eq!(bit_to_bool(0u8), Ok(false));
-        assert_eq!(bit_to_bool(1u8), Ok(true));
-        assert!(bit_to_bool(2u8).is_err());
-    }
-
-    #[test]
     fn test_bits_to_num() {
-        assert_eq!(bits_to_number(&[true, false]), 2);
-        assert_eq!(bits_to_number(&[true, true, false]), 6);
+        assert_eq!(bits_to_number(&[true, false]), 0b10);
+        assert_eq!(bits_to_number(&[true, true, false]), 0b110);
         assert_eq!(bits_to_number(&[false, false, false]), 0);
         assert_eq!(bits_to_number(&[false, false, true]), 1);
+        assert_eq!(
+            bits_to_number(&[true, false, false, false, true, true, false, true, true]),
+            0b100011011
+        );
     }
 }

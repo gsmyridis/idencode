@@ -1,6 +1,6 @@
 
 /// Creates an error with the provided name and error message.
-macro_rules! create_error {
+macro_rules! define_error {
     ($name:ident, $msg:expr) => {
         #[derive(Debug, PartialEq)]
         pub struct $name;
@@ -15,10 +15,9 @@ macro_rules! create_error {
     };
 }
 
-create_error!(InvalidBitError, "Bit can be either 1 or 0.");
-create_error!(InvalidVariableByteCode, "Invalid variable byte code.");
-create_error!(InvalidGammaCode, "Invalid gamma code.");
-create_error!(InvalidUnaryCode, "Invalid unary code.");
+define_error!(InvalidVariableByteCode, "Invalid variable byte code.");
+define_error!(InvalidGammaCode, "Invalid gamma code.");
+define_error!(InvalidUnaryCode, "Invalid unary code.");
 
 impl From<InvalidUnaryCode> for InvalidGammaCode {
     fn from(_err: InvalidUnaryCode) -> InvalidGammaCode {

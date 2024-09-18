@@ -4,34 +4,41 @@ use super::unary::UnaryEncoder;
 use crate::error::InvalidGammaCode;
 use crate::util::bits_to_number;
 use crate::io::BitWriter;
+use crate::num::Numeric;
 
 pub struct GammaEncoder<W: Write> {
     writer: BitWriter<W>,
 }
 
 impl<W: Write> GammaEncoder<W> {
+    /// Creates a new Elias gamma encoder, wrapping a writer.
     pub fn new(writer: W) -> Self {
         GammaEncoder{ writer: BitWriter::new(writer) }
     }
 
-    pub fn write(&mut self, nums: &[u32]) -> io::Result<()> {
+    ///
+    pub fn write<T>(&mut self, nums: &[T]) -> io::Result<()>
+    where
+        T: Numeric,
+    {
         // We reuse a single vector to store the offset bits for each number in `nums`.
         // For each number, we clear the vector, calculate the offset bits, and store
         // them in the vector. This approach avoids redundant heap allocations by reusing
         // the same vector instead of creating a new one for each number.
-        let mut offset_bits = vec![];
+        let mut offset_bits = Vec::new();
 
         for n in nums {
             offset_bits.clear();
 
             // Calculate the offset bits.
             // We need to find all the bits of the number's binary representation
-            // except the leading 1 bit. The way to do this is to `AndBit` each
-            // power of 2, with the number itself.
-            let leading_one_idx = u32::BITS - n.leading_zeros() - 1;
+            // except the leading 1 bit. The way to do this is to extract each bit
+            // starting from the most significant bit (after the leading one).
+            let leading_one_idx = T::BITS - n.leading_zeros() - 1;
             for i in 0..leading_one_idx {
-                let base = 1 << (leading_one_idx - i - 1);
-                if n & base == 0 {
+                let shift = leading_one_idx - i - 1;
+                let base = T::ONE << shift;
+                if (*n & base).is_zero() {
                     offset_bits.push(false);
                 } else {
                     offset_bits.push(true);
@@ -43,8 +50,8 @@ impl<W: Write> GammaEncoder<W> {
             let len_bits = UnaryEncoder::encode(len);
 
             // Write length and offset bits in bit-writer.
-            self.writer.write_bits(len_bits.as_slice())?;
-            self.writer.write_bits(offset_bits.as_slice())?;
+            self.writer.write_bits(&len_bits)?;
+            self.writer.write_bits(&offset_bits)?;
         }
         Ok(())
     }
@@ -109,21 +116,21 @@ mod tests {
         // Example 1
         let writer = Cursor::new(vec![]);
         let mut ge = GammaEncoder::new(writer);
-        ge.write(&[0b10]).unwrap();
+        ge.write(&[0b10_u32]).unwrap();
         let result = ge.finalize().unwrap().into_inner();
         assert_eq!(result, vec![0b100]);
 
         // Example 2
         let writer = Cursor::new(vec![]);
         let mut ge = GammaEncoder::new(writer);
-        ge.write(&[3]).unwrap();
+        ge.write(&[3_u32]).unwrap();
         let result = ge.finalize().unwrap().into_inner();
         assert_eq!(result, vec![5]);
 
         // Example 3
         let writer = Cursor::new(vec![]);
         let mut ge = GammaEncoder::new(writer);
-        ge.write(&[9]).unwrap();
+        ge.write(&[9_u32]).unwrap();
         let result = ge.finalize().unwrap().into_inner();
         assert_eq!(result, vec![113]);
     }
@@ -133,14 +140,14 @@ mod tests {
         // Example 1
         let writer = Cursor::new(vec![]);
         let mut ge = GammaEncoder::new(writer);
-        ge.write(&[2, 3]).unwrap();
+        ge.write(&[2_u32, 3]).unwrap();
         let result = ge.finalize().unwrap().into_inner();
         assert_eq!(result, vec![37]);
 
         // Example 2
         let writer = Cursor::new(vec![]);
         let mut ge = GammaEncoder::new(writer);
-        ge.write(&[2, 3, 9]).unwrap();
+        ge.write(&[2_u32, 3, 9]).unwrap();
         let result = ge.finalize().unwrap().into_inner();
         assert_eq!(result, vec![151, 17]);
     }
