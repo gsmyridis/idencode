@@ -1,10 +1,9 @@
-use std::io::{self, Write};
+use std::io::{self, Write, Read};
 
 use super::unary::UnaryEncoder;
 use crate::error::InvalidGammaCode;
-use crate::util::bits_to_number;
 use crate::io::BitWriter;
-use crate::num::Numeric;
+use crate::num::{Numeric, bits_to_numeric};
 
 pub struct GammaEncoder<W: Write> {
     writer: BitWriter<W>,
@@ -16,7 +15,7 @@ impl<W: Write> GammaEncoder<W> {
         GammaEncoder{ writer: BitWriter::new(writer) }
     }
 
-    ///
+    /// Writes numbers in slice in the inner bit-writer after encoding them.
     pub fn write<T>(&mut self, nums: &[T]) -> io::Result<()>
     where
         T: Numeric,
@@ -63,11 +62,26 @@ impl<W: Write> GammaEncoder<W> {
     }
 }
 
-pub struct GammaDecoder;
+pub struct GammaDecoder<R> {
+    reader: R
+}
 
-impl GammaDecoder {
+impl<R: Read> GammaDecoder<R> {
+    /// Creates a new Elias gamma decoder, wrapping a reader.
+    pub fn new(reader: R) -> Self {
+        GammaDecoder { reader }
+    }
+
+    // pub fn decode<T>(mut self) -> Result<Vec<T>, InvalidGammaCode> where T: Numeric {
+    //     let mut buffer = vec![];
+    //     self.reader.read_to_end(&mut buffer).expect("Failed to read reader.");
+    //     Self::decode_bits(buffer.as_ref())
+    // }
+}
+
+impl GammaDecoder<()> {
     /// Decode a Gamma encoded stream of bits.
-    pub fn decode_bits(bits: &[bool]) -> Result<Vec<u32>, InvalidGammaCode> {
+    fn decode_bits<T: Numeric>(bits: &[bool]) -> Result<Vec<T>, InvalidGammaCode> {
         let mut nums = vec![];
         let mut bits = bits;
 
@@ -90,7 +104,8 @@ impl GammaDecoder {
                     let mut n_bits = Vec::with_capacity(len);
                     n_bits.push(true);
                     n_bits.extend_from_slice(&rest[..len]);
-                    nums.push(bits_to_number(n_bits.as_slice()));
+                    let numeric = bits_to_numeric(n_bits.as_slice()).unwrap();
+                    nums.push(numeric);
 
                     if let Some((_, r)) = rest.split_at_checked(len + 1) {
                         bits = r;
@@ -101,7 +116,6 @@ impl GammaDecoder {
                 None => return Err(InvalidGammaCode),
             }
         }
-
         Ok(nums)
     }
 }
@@ -154,25 +168,36 @@ mod tests {
 
     #[test]
     fn test_decode_bits_success() {
-        assert_eq!(GammaDecoder::decode_bits(&[]), Ok(vec![]));
+        assert_eq!(GammaDecoder::decode_bits::<u8>(&[]), Ok(vec![]));
         assert_eq!(
-            GammaDecoder::decode_bits(&[true, false, false]),
+            GammaDecoder::decode_bits::<u8>(&[true, false, false]),
             Ok(vec![2])
         );
         assert_eq!(
-            GammaDecoder::decode_bits(&[true, true, false, false, false]),
+            GammaDecoder::decode_bits::<u8>(&[true, true, false, false, false]),
             Ok(vec![4])
         );
         assert_eq!(
-            GammaDecoder::decode_bits(&[true, true, true, false, false, false, true]),
+            GammaDecoder::decode_bits::<u8>(&[true, true, true, false, false, false, true]),
             Ok(vec![9])
         );
     }
 
     #[test]
     fn test_decode_bits_fail() {
-        assert!(GammaDecoder::decode_bits(&[false, true, true]).is_err());
-        assert!(GammaDecoder::decode_bits(&[true, true, false]).is_err());
-        assert!(GammaDecoder::decode_bits(&[true, true, true]).is_err());
+        assert!(GammaDecoder::decode_bits::<u8>(&[false, true, true]).is_err());
+        assert!(GammaDecoder::decode_bits::<u8>(&[true, true, false]).is_err());
+        assert!(GammaDecoder::decode_bits::<u8>(&[true, true, true]).is_err());
+    }
+
+    #[test]
+    fn test() {
+        let x = Cursor::new(vec![]);
+        let mut e = GammaEncoder::new(x);
+        e.write(&[u8::MAX, u8::MAX - 1]).unwrap();
+        let x = e.finalize().unwrap();
+
+        let d = GammaDecoder::new(x);
+        // println!("{:?}", d.decode::<u32>());
     }
 }

@@ -2,20 +2,28 @@ use std::io::{self, BufWriter, Write};
 
 use anyhow::Context;
 
-use crate::bitqueue::BitQueue;
+use crate::collections::BitVec;
 
 /// This structure represents a bit-writer.
-pub struct BitWriter<W: Write> {
-    buffer: BitQueue,
-    writer: BufWriter<W>,
+pub struct BitWriter<W: ?Sized + Write> {
+    // The buffer. Avoid using this like a normal `Vec` in common code paths.
+    // That is, don't use `buf.push`, `buf.extend_from_slice`, or any other
+    // methods that require bounds checking or the like. This makes an enormous
+    // difference to performance (we may want to stop using a `Vec` entirely).
+    buf: BitVec,
+    // #30888: If the inner writer panics in a call to write, we don't want to
+    // write the buffered data a second time in BufWriter's destructor. This
+    // flag tells the Drop impl if it should skip the flush.
+    // panicked: bool,
+    inner: W,
 }
 
 impl<W: Write> BitWriter<W> {
     /// Creates a new bit-writer.
     pub fn new(writer: W) -> Self {
         BitWriter {
-            buffer: BitQueue::new(),
-            writer: BufWriter::new(writer),
+            buf: BitVec::new(),
+            inner: writer,
         }
     }
 
@@ -41,15 +49,15 @@ impl<W: Write> BitWriter<W> {
     /// assert_eq!(*bw.get_ref(), [0b110]);
     /// ```
     pub fn write_bit(&mut self, bit: bool) -> io::Result<()> {
-        self.buffer.push(bit);
-        if *self.buffer.bit_position() == 0 && !self.buffer.is_empty() {
+        self.buf.push(bit);
+        if *self.buf.bit_position() == 0 && !self.buf.is_empty() {
             let byte = *self
-                .buffer
+                .buf
                 .as_slice()
                 .get(0)
                 .expect("It is guaranteed that at least one byte exists.");
-            self.buffer.clear();
-            self.writer.write(&[byte])?;
+            self.reset();
+            self.inner.write(&[byte])?;
         }
         Ok(())
     }
@@ -81,7 +89,7 @@ impl<W: Write> BitWriter<W> {
     /// Note that the buffer does not contain the byte that is currently
     /// written.
     pub fn get_ref(&self) -> &[u8] {
-        self.buffer.as_slice()
+        self.buf.as_slice()
     }
 
     /// Acquires a mutable reference to the underlying writer.
@@ -91,13 +99,13 @@ impl<W: Write> BitWriter<W> {
     /// the stream may corrupt this object, so care must be taken when
     /// using this method.
     pub fn get_mut(&mut self) -> &mut [u8] {
-        self.buffer.as_mut_slice()
+        self.buf.as_mut_slice()
     }
 
     /// Resets the state of this bit-writer entirely, cleaning the underlying
     /// buffer, and resets the current byte and current bit's position.
     pub fn reset(&mut self) {
-        self.buffer.clear()
+        self.buf.clear()
     }
 
     /// Consumes the bit-writer and finalizes the writing, returning the
@@ -128,11 +136,9 @@ impl<W: Write> BitWriter<W> {
     /// assert_eq!(result.into_inner(), vec![0b00000010]);
     /// ```
     pub fn finalize(mut self) -> anyhow::Result<W> {
-        self.writer.write_all(self.buffer.as_slice()).context("")?;
-        self.writer.flush().context("")?;
-        self.writer
-            .into_inner()
-            .map_err(|_| anyhow::anyhow!("Failed to recover inner writer."))
+        self.inner.write_all(self.buf.as_slice()).context("")?;
+        self.inner.flush().context("")?;
+        Ok(self.inner)
     }
 }
 

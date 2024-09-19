@@ -1,32 +1,35 @@
+mod convert;
+
 use std::fmt::Debug;
-use std::mem;
 use std::ops::{
     BitAnd, BitOrAssign, BitXor, DivAssign, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign,
     Sub,
 };
 
+pub use convert::{bits_to_numeric};
+
 /// This trait extends many common integer types (both unsigned and signed)
 /// with a few trivial methods so that they can be used
 /// with the bitstream handling traits.
 pub trait Numeric:
-Sized
-+ Copy
-+ Default
-+ Debug
-+ PartialOrd
-+ DivAssign
-+ Shl<u32, Output = Self>
-+ ShlAssign<u32>
-+ Shr<u32, Output = Self>
-+ ShrAssign<u32>
-+ Rem<Self, Output = Self>
-+ RemAssign<Self>
-+ BitAnd<Self, Output = Self>
-+ BitOrAssign<Self>
-+ BitXor<Self, Output = Self>
-+ Not<Output = Self>
-+ Sub<Self, Output = Self>
-+ From<u8>
+    Sized
+    + Copy
+    + Default
+    + Debug
+    + PartialOrd
+    + DivAssign
+    + Shl<u32, Output = Self>
+    + ShlAssign<u32>
+    + Shr<u32, Output = Self>
+    + ShrAssign<u32>
+    + Rem<Self, Output = Self>
+    + RemAssign<Self>
+    + BitAnd<Self, Output = Self>
+    + BitOrAssign<Self>
+    + BitXor<Self, Output = Self>
+    + Not<Output = Self>
+    + Sub<Self, Output = Self>
+    + From<u8>
 {
     /// Size of type in bits
     const BITS: u32;
@@ -36,6 +39,9 @@ Sized
 
     /// Returns 1 as `Self`.
     const ONE: Self;
+
+    /// Returns the maximum
+    const MAX: Self;
 
     /// Returns true if this value is 0, in its type
     #[inline(always)]
@@ -54,10 +60,9 @@ macro_rules! define_numeric {
     ($t:ty) => {
         impl Numeric for $t {
             const BITS: u32 = <$t>::BITS;
-
             const ZERO: Self = 0;
-
             const ONE: Self = 1;
+            const MAX: Self = <$t>::MAX;
 
             #[inline(always)]
             fn to_u8(self) -> Option<u8> {
