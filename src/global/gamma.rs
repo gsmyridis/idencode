@@ -1,6 +1,6 @@
 use std::io::{self, Write, Read};
 
-use super::unary::UnaryEncoder;
+use super::unary::{UnaryDecoder, UnaryEncoder};
 use crate::error::InvalidGammaCode;
 use crate::io::BitWriter;
 use crate::num::{Numeric, bits_to_numeric};
@@ -57,7 +57,7 @@ impl<W: Write> GammaEncoder<W> {
 
     /// Consumes the encoder and finalizes the encoding, returning the
     /// underlying buffer.
-    pub fn finalize(self) -> anyhow::Result<W> {
+    pub fn finalize(self) -> io::Result<W> {
         self.writer.finalize()
     }
 }
@@ -86,7 +86,6 @@ impl GammaDecoder<()> {
         let mut bits = bits;
 
         loop {
-            // If the bits is empty, break.
             if bits.is_empty() {
                 break;
             }
@@ -95,7 +94,7 @@ impl GammaDecoder<()> {
             match bits.iter().position(|b| !b) {
                 Some(idx) => {
                     let (len_bits, rest) = bits.split_at(idx + 1);
-                    let len = UnaryEncoder::decode(len_bits)?;
+                    let len = UnaryDecoder::decode(len_bits)?;
 
                     if rest.len() < len {
                         return Err(InvalidGammaCode);
@@ -132,21 +131,21 @@ mod tests {
         let mut ge = GammaEncoder::new(writer);
         ge.write(&[0b10_u32]).unwrap();
         let result = ge.finalize().unwrap().into_inner();
-        assert_eq!(result, vec![0b100]);
+        assert_eq!(result, vec![0b10000000]);
 
         // Example 2
         let writer = Cursor::new(vec![]);
         let mut ge = GammaEncoder::new(writer);
-        ge.write(&[3_u32]).unwrap();
+        ge.write(&[0b11_u32]).unwrap();
         let result = ge.finalize().unwrap().into_inner();
-        assert_eq!(result, vec![5]);
+        assert_eq!(result, vec![0b10100000]);
 
         // Example 3
         let writer = Cursor::new(vec![]);
         let mut ge = GammaEncoder::new(writer);
         ge.write(&[9_u32]).unwrap();
         let result = ge.finalize().unwrap().into_inner();
-        assert_eq!(result, vec![113]);
+        assert_eq!(result, vec![0b11100010]);
     }
 
     #[test]
@@ -156,14 +155,14 @@ mod tests {
         let mut ge = GammaEncoder::new(writer);
         ge.write(&[2_u32, 3]).unwrap();
         let result = ge.finalize().unwrap().into_inner();
-        assert_eq!(result, vec![37]);
+        assert_eq!(result, vec![0b10010100]);
 
         // Example 2
         let writer = Cursor::new(vec![]);
         let mut ge = GammaEncoder::new(writer);
         ge.write(&[2_u32, 3, 9]).unwrap();
         let result = ge.finalize().unwrap().into_inner();
-        assert_eq!(result, vec![151, 17]);
+        assert_eq!(result, vec![0b10010111, 0b10001000]);
     }
 
     #[test]

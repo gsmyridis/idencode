@@ -7,6 +7,6 @@ pub mod num;
 
 pub use collections::BitVec;
 
-pub use global::unary::UnaryEncoder;
+pub use global::unary::{UnaryDecoder, UnaryEncoder};
 pub use global::vb::{VBDecoder, VBEncoder};
 pub use global::gamma::GammaEncoder;

@@ -23,6 +23,12 @@ impl UnaryEncoder {
         bits.push(false);
         bits
     }
+}
+
+pub struct UnaryDecoder;
+
+
+impl UnaryDecoder {
 
     /// Decodes a unary encoded number from bits.
     ///
@@ -31,13 +37,13 @@ impl UnaryEncoder {
     ///
     /// # Examples
     /// ```
-    /// use idencode::UnaryEncoder;
+    /// use idencode::UnaryDecoder;
     ///
-    /// assert_eq!(UnaryEncoder::decode(&[false]), Ok(0));
-    /// assert_eq!(UnaryEncoder::decode(&[true, false]), Ok(1));
-    /// assert_eq!(UnaryEncoder::decode(&[true, true, false]), Ok(2));
-    /// assert!(UnaryEncoder::decode(&[true, true]).is_err());
-    /// assert!(UnaryEncoder::decode(&[true, false, true]).is_err());
+    /// assert_eq!(UnaryDecoder::decode(&[false]), Ok(0));
+    /// assert_eq!(UnaryDecoder::decode(&[true, false]), Ok(1));
+    /// assert_eq!(UnaryDecoder::decode(&[true, true, false]), Ok(2));
+    /// assert!(UnaryDecoder::decode(&[true, true]).is_err());
+    /// assert!(UnaryDecoder::decode(&[true, false, true]).is_err());
     /// ```
     pub fn decode(code: &[bool]) -> Result<usize, InvalidUnaryCode> {
         // Check if the code is terminated by '0'.

@@ -1,30 +1,25 @@
-use std::io::{self, BufWriter, Write};
+use std::io::{self, Write};
 
 use anyhow::Context;
 
 use crate::collections::BitVec;
+use crate::io::DEFAULT_BUF_SIZE;
 
 /// This structure represents a bit-writer.
 pub struct BitWriter<W: ?Sized + Write> {
-    // The buffer. Avoid using this like a normal `Vec` in common code paths.
-    // That is, don't use `buf.push`, `buf.extend_from_slice`, or any other
-    // methods that require bounds checking or the like. This makes an enormous
-    // difference to performance (we may want to stop using a `Vec` entirely).
     buf: BitVec,
-    // #30888: If the inner writer panics in a call to write, we don't want to
-    // write the buffered data a second time in BufWriter's destructor. This
-    // flag tells the Drop impl if it should skip the flush.
-    // panicked: bool,
     inner: W,
 }
 
 impl<W: Write> BitWriter<W> {
-    /// Creates a new bit-writer.
-    pub fn new(writer: W) -> Self {
-        BitWriter {
-            buf: BitVec::new(),
-            inner: writer,
-        }
+    /// Creates a new `BufWriter<W>` with a default buffer capacity.
+    pub fn new(inner: W) -> BitWriter<W> {
+        BitWriter::with_capacity(DEFAULT_BUF_SIZE, inner)
+    }
+
+    /// Creates a new `BitWriter<W>` with at least the specified buffer capacity.
+    pub fn with_capacity(capacity: usize, inner: W) -> BitWriter<W> {
+        BitWriter { inner, buf: BitVec::with_capacity(capacity) }
     }
 
     /// Writes the bits of a given value in a most-significant-bit-first (MSB-first)
@@ -46,19 +41,10 @@ impl<W: Write> BitWriter<W> {
     ///     bw.write_bit(bit).unwrap();
     /// }
     ///
-    /// assert_eq!(*bw.get_ref(), [0b110]);
+    /// assert_eq!(*bw.get_ref(), [0b11000000]);
     /// ```
     pub fn write_bit(&mut self, bit: bool) -> io::Result<()> {
         self.buf.push(bit);
-        if *self.buf.bit_position() == 0 && !self.buf.is_empty() {
-            let byte = *self
-                .buf
-                .as_slice()
-                .get(0)
-                .expect("It is guaranteed that at least one byte exists.");
-            self.reset();
-            self.inner.write(&[byte])?;
-        }
         Ok(())
     }
 
@@ -133,11 +119,11 @@ impl<W: Write> BitWriter<W> {
     /// let result = bw.finalize().unwrap();
     /// // The final buffer will contain a single byte, with `10` (binary) padded from the
     /// // left to become `000000010`.
-    /// assert_eq!(result.into_inner(), vec![0b00000010]);
+    /// assert_eq!(result.into_inner(), vec![0b10000000]);
     /// ```
-    pub fn finalize(mut self) -> anyhow::Result<W> {
-        self.inner.write_all(self.buf.as_slice()).context("")?;
-        self.inner.flush().context("")?;
+    pub fn finalize(mut self) -> io::Result<W> {
+        self.inner.write_all(self.buf.as_slice())?;
+        self.inner.flush()?;
         Ok(self.inner)
     }
 }
@@ -157,6 +143,6 @@ mod tests {
         ];
         bw.write_bits(&bits).unwrap();
         let result = bw.finalize().unwrap();
-        assert_eq!(result.into_inner(), vec![3, 1, 2])
+        assert_eq!(result.into_inner(), vec![0b00000011, 0b00000001, 0b01000000])
     }
 }
