@@ -19,7 +19,10 @@ impl<W: Write> BitWriter<W> {
 
     /// Creates a new `BitWriter<W>` with at least the specified buffer capacity.
     pub fn with_capacity(capacity: usize, inner: W) -> BitWriter<W> {
-        BitWriter { inner, buf: BitVec::with_capacity(capacity) }
+        BitWriter {
+            inner,
+            buf: BitVec::with_capacity(capacity),
+        }
     }
 
     /// Writes the bits of a given value in a most-significant-bit-first (MSB-first)
@@ -61,7 +64,7 @@ impl<W: Write> BitWriter<W> {
     /// bw.write_bits(&[true, true, false, true, false, false, false, false]).unwrap();
     ///
     /// let result = bw.finalize().unwrap().into_inner();
-    /// assert_eq!(result, [0b11010000]);
+    /// assert_eq!(result, [0b11010000, 0b10000000]);
     /// ```
     pub fn write_bits(&mut self, bits: &[bool]) -> io::Result<()> {
         for bit in bits {
@@ -124,12 +127,7 @@ impl<W: Write> BitWriter<W> {
             return Ok(self.inner);
         }
 
-        // Add terminating 1-bit at the end.
-        let bit_pos = *self.buf.bit_position();
-        let byte = self.buf.last_byte_mut()
-            .expect("Buffer is guaranteed to not be empty.");
-        *byte |= 1 << (7 - bit_pos);
-
+        self.buf.push(true); // Add the terminating bit.
         self.inner.write_all(self.buf.as_slice())?;
         self.inner.flush()?;
         Ok(self.inner)
@@ -147,10 +145,13 @@ mod tests {
         let mut bw = BitWriter::new(writer);
         let bits = vec![
             false, false, false, false, false, false, true, true, false, false, false, false,
-            false, false, false, true, false, true, false,
+            false, false, false, true,
         ];
         bw.write_bits(&bits).unwrap();
         let result = bw.finalize().unwrap();
-        assert_eq!(result.into_inner(), vec![0b00000011, 0b00000001, 0b01010000])
+        assert_eq!(
+            result.into_inner(),
+            vec![0b00000011, 0b00000001, 0b10000000]
+        )
     }
 }
