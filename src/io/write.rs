@@ -117,11 +117,19 @@ impl<W: Write> BitWriter<W> {
     /// bw.write_bit(true).unwrap();
     /// bw.write_bit(false).unwrap();
     /// let result = bw.finalize().unwrap();
-    /// // The final buffer will contain a single byte, with `10` (binary) padded from the
-    /// // left to become `000000010`.
-    /// assert_eq!(result.into_inner(), vec![0b10000000]);
+    /// assert_eq!(result.into_inner(), vec![0b10100000]);
     /// ```
     pub fn finalize(mut self) -> io::Result<W> {
+        if self.buf.is_empty() {
+            return Ok(self.inner);
+        }
+
+        // Add terminating 1-bit at the end.
+        let bit_pos = *self.buf.bit_position();
+        let byte = self.buf.last_byte_mut()
+            .expect("Buffer is guaranteed to not be empty.");
+        *byte |= 1 << (7 - bit_pos);
+
         self.inner.write_all(self.buf.as_slice())?;
         self.inner.flush()?;
         Ok(self.inner)
@@ -143,6 +151,6 @@ mod tests {
         ];
         bw.write_bits(&bits).unwrap();
         let result = bw.finalize().unwrap();
-        assert_eq!(result.into_inner(), vec![0b00000011, 0b00000001, 0b01000000])
+        assert_eq!(result.into_inner(), vec![0b00000011, 0b00000001, 0b01010000])
     }
 }

@@ -170,6 +170,38 @@ impl BitVec {
         self.inner.len()
     }
 
+    /// Extracts a shared reference to the last byte.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use idencode::{BitVec, bitvec};
+    ///
+    /// let bitvec = bitvec![true; 11];
+    /// let last_byte = bitvec.last_byte().unwrap();
+    /// assert_eq!(*last_byte, 0b11100000);
+    /// ```
+    pub fn last_byte(&self) -> Option<&u8> {
+        self.inner.last()
+    }
+
+    /// Extracts a mutable reference to the last byte.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use idencode::{BitVec, bitvec};
+    ///
+    /// let mut bitvec = bitvec![true; 11];
+    /// let last_byte = bitvec.last_byte_mut().unwrap();
+    /// *last_byte = 0;
+    /// assert_eq!(*bitvec.as_slice(), [0b11111111, 0]);
+    /// ```
+    #[inline]
+    pub fn last_byte_mut(&mut self) -> Option<&mut u8> {
+        self.inner.last_mut()
+    }
+
     /// Returns `true` if the bit-vector contains no bits.
     ///
     /// # Examples

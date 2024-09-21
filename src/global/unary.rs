@@ -1,12 +1,16 @@
 use crate::error::InvalidUnaryCode;
 
+
+/// A structure that encodes a non-negative integer using unary encoding.
+///
+/// In this version of unary encoding, a number *n* is represented by *n*
+/// consecutive 1-bits followed by a terminating 0-bit.
+///
+/// For example, the number 3 is encoded as 1110 in unary.
 pub struct UnaryEncoder;
 
 impl UnaryEncoder {
     /// Encodes a unary encoded number in bits.
-    ///
-    /// In this code an integer x ≥ 1 is coded as x - 1 one bits followed
-    /// by a zero bit, so that the code for integer 3 is 110.
     ///
     /// # Examples
     /// ```
@@ -25,15 +29,19 @@ impl UnaryEncoder {
     }
 }
 
+
+/// A structure that decodes a stream of bits using unary encoding.
+///
+/// In this version of unary encoding, a number *n* is represented by *n*
+/// consecutive 1-bits followed by a terminating 0-bit.
+///
+/// For example, the number 3 is encoded as 1110 in unary.
 pub struct UnaryDecoder;
 
 
 impl UnaryDecoder {
 
     /// Decodes a unary encoded number from bits.
-    ///
-    /// In this code an integer x ≥ 1 is coded as x - 1 one bits followed
-    /// by a zero bit, so that the code for integer 3 is 110.
     ///
     /// # Examples
     /// ```
