@@ -1,5 +1,4 @@
-use crate::error::InvalidUnaryCode;
-
+use crate::error::InvalidCodeError;
 
 /// A structure that encodes a non-negative integer using unary encoding.
 ///
@@ -53,16 +52,16 @@ impl UnaryDecoder {
     /// assert!(UnaryDecoder::decode(&[true, true]).is_err());
     /// assert!(UnaryDecoder::decode(&[true, false, true]).is_err());
     /// ```
-    pub fn decode(code: &[bool]) -> Result<usize, InvalidUnaryCode> {
+    pub fn decode(code: &[bool]) -> Result<usize, InvalidCodeError> {
         // Check if the code is terminated by '0'.
         if code.last() != Some(&false) {
-            return Err(InvalidUnaryCode);
+            return Err(InvalidCodeError);
         }
 
         // Check if the rest of the characters are '1's.
         for c in code[..code.len() - 1].iter() {
             if !(*c) {
-                return Err(InvalidUnaryCode);
+                return Err(InvalidCodeError);
             }
         }
 

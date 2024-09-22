@@ -15,7 +15,10 @@ impl<R: Read> BitReader<R> {
         BitReader{ inner: reader }
     }
 
-    /// Reads all the bits from
+    /// Reads all the bits from the underlying reader.
+    ///
+    /// The encoded data should be written with the most-significant bit (MSB) first
+    /// in big-endian byte order and should end with a terminating 1-bit.
     ///
     /// # Examples
     ///
@@ -53,11 +56,8 @@ impl<R: Read> BitReader<R> {
                     buffer.pop();
                 }
                 let len = (buffer.len() - 1) * 8 + (7 - pos) as usize;
-                dbg!("{:?}", &buffer);
                 let byte = buffer.last_mut().expect("The buffer is guaranteed to not be empty.");
-                dbg!(&byte);
                 *byte &= !(1 << pos);
-                dbg!(&byte);
                 Ok(BitVec::new(buffer, len)?)
             }
         }
@@ -65,8 +65,8 @@ impl<R: Read> BitReader<R> {
 }
 
 
-/// Returns the position of the trailing 1-bit.
-/// The position indexing starts from the right.
+// Returns the position of the trailing 1-bit.
+// The position indexing starts from the right.
 fn trailing_one_pos(byte: u8) -> Option<u8> {
     for i in 0..8 {
         if byte & (1 << i) != 0 {
@@ -80,6 +80,16 @@ fn trailing_one_pos(byte: u8) -> Option<u8> {
 mod tests {
 
     use super::*;
+    use std::io::Cursor;
+
+
+    #[test]
+    fn test_empty_bitvec() {
+        let reader = Cursor::new(Vec::<u8>::new());
+        let reader = BitReader::new(reader);
+        let bitvec = reader.read_to_end().unwrap();
+        assert!(bitvec.is_empty());
+    }
 
     #[test]
     fn test_trailing_one_pos() {

@@ -16,16 +16,10 @@ macro_rules! define_error {
 }
 
 define_error!(InvalidVariableByteCode, "Invalid variable byte code.");
-define_error!(InvalidGammaCode, "Invalid gamma code.");
-define_error!(InvalidUnaryCode, "Invalid unary code.");
+define_error!(InvalidCodeError, "Invalid code.");
 define_error!(OverflowError, "Overflow error.");
 define_error!(BitVecLengthError, "The provided length is incompatible with the provided buffer.");
 define_error!(NoTerminatingBitError, "Did not find a terminating 1-bit in the last byte.");
 
-impl From<InvalidUnaryCode> for InvalidGammaCode {
-    fn from(_err: InvalidUnaryCode) -> InvalidGammaCode {
-        InvalidGammaCode
-    }
-}
 
 

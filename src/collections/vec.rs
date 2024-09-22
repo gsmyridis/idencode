@@ -295,6 +295,31 @@ impl BitVec {
     pub fn as_bytes_mut(&mut self) -> &mut [u8] {
         self.inner.as_mut_slice()
     }
+
+    /// Converts the bit-vector to a vector of bits in boolean form.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use idencode::{BitVec, bitvec};
+    ///
+    /// let bitvec = bitvec![true, false, true, false, true, true, false, true, true, true];
+    /// let bits = bitvec.into_bits();
+    /// assert_eq!(bits, vec![true, false, true, false, true, true, false, true, true, true]);
+    /// ```
+    pub fn into_bits(self) -> Vec<bool> {
+        let mut bits = vec![];
+        for i in 0..self.len() {
+            let byte = self.inner.get(i / 8).expect("Guaranteed to get byte.");
+            let bit_pos = i % 8;
+            let bit = byte & (1 << (7 - bit_pos));
+            match bit {
+                0 => bits.push(false),
+                _ => bits.push(true),
+            }
+        }
+        bits
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
