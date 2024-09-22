@@ -1,6 +1,4 @@
 pub mod write;
-mod read;
-
-pub use write::BitWriter;
+pub mod read;
 
 pub const DEFAULT_BUF_SIZE: usize = 1 * 1024;

@@ -1,6 +1,6 @@
 use crate::io::DEFAULT_BUF_SIZE;
+use crate::error::BitVecLengthError;
 
-#[derive(Default)]
 pub struct BitVec {
     inner: Vec<u8>,
     bit_pos: u8,
@@ -8,12 +8,36 @@ pub struct BitVec {
 }
 
 impl BitVec {
-    /// Constructs a new, empty `BitVec`.
+
+    /// Creates a new bit-vector with specified buffer of bytes and length of
+    /// bit-vector.
     ///
-    /// The `BitVec` does not allocate until bits are pushed into it.
-    #[inline]
-    pub fn new() -> Self {
-        Self::with_capacity(DEFAULT_BUF_SIZE)
+    /// The number of bits in the buffer is necessary because the buffer will
+    /// always contain bytes.
+    ///
+    /// # Errors
+    ///
+    /// If the number of bits in the buffer is more than the capacity or there
+    /// are bytes that unnecessary.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use idencode::BitVec;
+    ///
+    /// let bitvec = BitVec::new(vec![0b10011001, 0b10001000], 14).unwrap();
+    /// assert_eq!(*bitvec.as_bytes(), [0b10011001, 0b10001000]);
+    /// assert_eq!(bitvec.len(), 14);
+    /// assert_eq!(*bitvec.bit_position(), 6);
+    ///
+    /// assert!(BitVec::new(vec![1, 2, 3], 15).is_err());
+    /// assert!(BitVec::new(vec![1, 2, 3], 25).is_err());
+    /// ```
+    pub fn new(buf: Vec<u8>, len: usize) -> Result<Self, BitVecLengthError> {
+        if (len > 8 * buf.len()) | (len < 8 * (buf.len() - 1)) {
+            return Err(BitVecLengthError);
+        }
+        Ok(BitVec { inner: buf, bit_pos: (len % 8) as u8, len})
     }
 
     /// Constructs a new, empty `BitVec` with at least the specified capacity.
@@ -69,12 +93,12 @@ impl BitVec {
     /// ```
     /// use idencode::collections::BitVec;
     ///
-    /// let mut bq = BitVec::new();
+    /// let mut bq = BitVec::default();
     /// let bits = vec![true, true, false, true, true, false, true, true, true, false];
     /// for bit in bits {
     ///     bq.push(bit);
     /// }
-    /// assert_eq!(bq.as_slice(), &[0b11011011, 0b10000000]);
+    /// assert_eq!(bq.as_bytes(), &[0b11011011, 0b10000000]);
     /// ```
     pub fn push(&mut self, bit: bool) {
         if self.bit_pos == 0 {
@@ -97,9 +121,9 @@ impl BitVec {
     /// ```
     /// use idencode::BitVec;
     ///
-    /// let mut bitvec = BitVec::new();
+    /// let mut bitvec = BitVec::default();
     /// bitvec.extend_from_slice(&[true, true, false, true, true, false, true, true, true, false]);
-    /// assert_eq!(bitvec.as_slice(), &[0b11011011, 0b10000000]);
+    /// assert_eq!(bitvec.as_bytes(), &[0b11011011, 0b10000000]);
     /// ```
     #[inline]
     pub fn extend_from_slice(&mut self, bits: &[bool]) {
@@ -195,7 +219,7 @@ impl BitVec {
     /// let mut bitvec = bitvec![true; 11];
     /// let last_byte = bitvec.last_byte_mut().unwrap();
     /// *last_byte = 0;
-    /// assert_eq!(*bitvec.as_slice(), [0b11111111, 0]);
+    /// assert_eq!(*bitvec.as_bytes(), [0b11111111, 0]);
     /// ```
     #[inline]
     pub fn last_byte_mut(&mut self) -> Option<&mut u8> {
@@ -247,10 +271,10 @@ impl BitVec {
     /// use idencode::{BitVec, bitvec};
     ///
     /// let mut bitvec = bitvec![true, true, false];
-    /// assert_eq!(*bitvec.as_slice(), [0b11000000]);
+    /// assert_eq!(*bitvec.as_bytes(), [0b11000000]);
     /// ```
     #[inline]
-    pub fn as_slice(&self) -> &[u8] {
+    pub fn as_bytes(&self) -> &[u8] {
         self.inner.as_slice()
     }
 
@@ -262,30 +286,14 @@ impl BitVec {
     /// use idencode::{BitVec, bitvec};
     ///
     /// let mut bitvec = bitvec![true, true, false];
-    /// assert_eq!(*bitvec.as_slice(), [0b11000000]);
-    /// let slice = bitvec.as_mut_slice();
+    /// assert_eq!(*bitvec.as_bytes(), [0b11000000]);
+    /// let slice = bitvec.as_bytes_mut();
     /// slice[0] = 0b111;
     /// assert_eq!(slice, [0b111]);
     /// ```
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+    pub fn as_bytes_mut(&mut self) -> &mut [u8] {
         self.inner.as_mut_slice()
-    }
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // Internal methods and functions
-    ////////////////////////////////////////////////////////////////////////////////
-
-    fn additional_bytes(&self, additional_bits: usize) -> usize {
-        // Available bits left in current byte.
-        let left = 8 - (self.bit_pos as usize);
-        if additional_bits > left {
-            // Additional number of more bits to reserve.
-            let additional_bits = additional_bits - left;
-            let additional_bytes = (additional_bits + 7) / 8;
-            return additional_bytes
-        }
-        0
     }
 }
 
@@ -296,12 +304,12 @@ impl BitVec {
 #[macro_export]
 macro_rules! bitvec {
     ($bit:expr; $n:expr) => {{
-        let mut bitvec = BitVec::new();
+        let mut bitvec = BitVec::default();
         bitvec.extend_from_slice(&[$bit; $n]);
         bitvec
     }};
     ( $( $b:expr ),* ) => {{
-        let mut bitvec = BitVec::new();
+        let mut bitvec = BitVec::default();
         bitvec.extend_from_slice(&[$( $b ),* ]);
         bitvec
     }};
@@ -314,9 +322,9 @@ macro_rules! bitvec {
 // Implementation of common traits
 ////////////////////////////////////////////////////////////////////////////////
 
-impl From<Vec<u8>> for BitVec {
-    fn from(v: Vec<u8>) -> BitVec {
-        BitVec { inner: v, bit_pos: 0, len: 0 }
+impl Default for BitVec {
+    fn default() -> Self {
+        Self::with_capacity(DEFAULT_BUF_SIZE)
     }
 }
 
@@ -329,24 +337,16 @@ mod tests {
     fn test_macro() {
         // Case 1
         let bitvec = bitvec![true; 10];
-        assert_eq!(*bitvec.as_slice(), [0b11111111, 0b11000000]);
+        assert_eq!(*bitvec.as_bytes(), [0b11111111, 0b11000000]);
 
         // Case 2 & 3
         let bitvec = bitvec![true, true, false, true, false, ];
-        assert_eq!(*bitvec.as_slice(), [0b11010000]);
+        assert_eq!(*bitvec.as_bytes(), [0b11010000]);
     }
 
     #[test]
     fn test_len() {
         let bitvec = bitvec![];
         assert_eq!(bitvec.len(), 0);
-    }
-
-    #[test]
-    fn test_additional_bytes() {
-        let bitvec = bitvec![true, false];
-        assert_eq!(bitvec.additional_bytes(3), 0);
-        assert_eq!(bitvec.additional_bytes(6), 0);
-        assert_eq!(bitvec.additional_bytes(17), 2);
     }
 }

@@ -2,7 +2,7 @@ use std::io::{self, Write, Read};
 
 use super::unary::{UnaryDecoder, UnaryEncoder};
 use crate::error::InvalidGammaCode;
-use crate::io::BitWriter;
+use crate::io::write::BitWriter;
 use crate::num::{Numeric, bits_to_numeric};
 
 /// A structure that wraps a writer and encodes a sequence of integers

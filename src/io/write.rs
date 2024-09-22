@@ -35,7 +35,7 @@ impl<W: Write> BitWriter<W> {
     ///
     /// ```
     /// use std::io::Cursor;
-    /// use idencode::io::BitWriter;
+    /// use idencode::BitWriter;
     ///
     /// let writer = Cursor::new(vec![]);
     /// let mut bw = BitWriter::new(writer);
@@ -57,7 +57,7 @@ impl<W: Write> BitWriter<W> {
     ///
     /// ```
     /// use std::io::Cursor;
-    /// use idencode::io::BitWriter;
+    /// use idencode::BitWriter;
     ///
     /// let writer = Cursor::new(vec![]);
     /// let mut bw = BitWriter::new(writer);
@@ -78,7 +78,7 @@ impl<W: Write> BitWriter<W> {
     /// Note that the buffer does not contain the byte that is currently
     /// written.
     pub fn get_ref(&self) -> &[u8] {
-        self.buf.as_slice()
+        self.buf.as_bytes()
     }
 
     /// Acquires a mutable reference to the underlying writer.
@@ -88,7 +88,7 @@ impl<W: Write> BitWriter<W> {
     /// the stream may corrupt this object, so care must be taken when
     /// using this method.
     pub fn get_mut(&mut self) -> &mut [u8] {
-        self.buf.as_mut_slice()
+        self.buf.as_bytes_mut()
     }
 
     /// Resets the state of this bit-writer entirely, cleaning the underlying
@@ -113,7 +113,7 @@ impl<W: Write> BitWriter<W> {
     ///
     /// ```
     /// use std::io::Cursor;
-    /// use idencode::io::BitWriter;
+    /// use idencode::BitWriter;
     ///
     /// let writer = Cursor::new(vec![]);
     /// let mut bw = BitWriter::new(writer);
@@ -128,7 +128,7 @@ impl<W: Write> BitWriter<W> {
         }
 
         self.buf.push(true); // Add the terminating bit.
-        self.inner.write_all(self.buf.as_slice())?;
+        self.inner.write_all(self.buf.as_bytes())?;
         self.inner.flush()?;
         Ok(self.inner)
     }
