@@ -12,7 +12,7 @@ pub struct BitReader<R: Read> {
 impl<R: Read> BitReader<R> {
     /// Creates a new `BitReader` from a reader.
     pub fn new(reader: R) -> Self {
-        BitReader{ inner: reader }
+        BitReader { inner: reader }
     }
 
     /// Reads all the bits from the underlying reader.
@@ -44,7 +44,9 @@ impl<R: Read> BitReader<R> {
 
         // Find the terminating bit, and return a BitVec with the appropriate
         // buffer, and length.
-        let &byte = buffer.last().expect("The buffer is guaranteed to not be empty.");
+        let &byte = buffer
+            .last()
+            .expect("The buffer is guaranteed to not be empty.");
         let term_bit_pos = trailing_one_pos(byte);
         return match term_bit_pos {
             None => Err(anyhow!(NoTerminatingBitError)),
@@ -55,17 +57,17 @@ impl<R: Read> BitReader<R> {
                 if pos == 7 {
                     buffer.pop();
                 } else {
-                    let byte = buffer.last_mut()
+                    let byte = buffer
+                        .last_mut()
                         .expect("The buffer is guaranteed to not be empty.");
                     *byte &= !(1 << pos);
                 }
                 let len = (buffer.len() - 1) * 8 + (7 - pos) as usize;
                 Ok(BitVec::new(buffer, len)?)
             }
-        }
+        };
     }
 }
-
 
 // Returns the position of the trailing 1-bit.
 // The position indexing starts from the right.
@@ -83,7 +85,6 @@ mod tests {
 
     use super::*;
     use std::io::Cursor;
-
 
     #[test]
     fn test_empty_bitvec() {
@@ -108,4 +109,3 @@ mod tests {
         assert_eq!(trailing_one_pos(0b10000000), Some(7));
     }
 }
-

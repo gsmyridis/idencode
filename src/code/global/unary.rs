@@ -28,7 +28,6 @@ impl UnaryEncoder {
     }
 }
 
-
 /// A structure that decodes a stream of bits using unary encoding.
 ///
 /// In this version of unary encoding, a number *n* is represented by *n*
@@ -37,9 +36,7 @@ impl UnaryEncoder {
 /// For example, the number 3 is encoded as 1110 in unary.
 pub struct UnaryDecoder;
 
-
 impl UnaryDecoder {
-
     /// Decodes a unary encoded number from bits.
     ///
     /// # Examples

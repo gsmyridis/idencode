@@ -1,11 +1,11 @@
-use std::io::{self, Write, Read};
+use std::io::{self, Read, Write};
 
 use super::unary::{UnaryDecoder, UnaryEncoder};
+use crate::code::{Decoder, Encoder};
 use crate::error::InvalidCodeError;
-use crate::io::write::BitWriter;
 use crate::io::read::BitReader;
-use crate::num::{Numeric, bits_to_numeric};
-use crate::code::{Encoder, Decoder};
+use crate::io::write::BitWriter;
+use crate::num::{bits_to_numeric, Numeric};
 
 /// A structure that wraps a writer and encodes a sequence of integers
 /// using Elias Gamma Encoding.
@@ -25,7 +25,9 @@ pub struct GammaEncoder<W: Write> {
 
 impl<W: Write> Encoder<W> for GammaEncoder<W> {
     fn new(writer: W) -> Self {
-        GammaEncoder{ writer: BitWriter::new(writer) }
+        GammaEncoder {
+            writer: BitWriter::new(writer),
+        }
     }
 
     fn write<T>(&mut self, nums: &[T]) -> io::Result<()>
@@ -72,7 +74,6 @@ impl<W: Write> Encoder<W> for GammaEncoder<W> {
     }
 }
 
-
 /// A structure that wraps a reader and decodes a stream of bytes
 /// using Elias Gamma Encoding.
 ///
@@ -86,12 +87,14 @@ impl<W: Write> Encoder<W> for GammaEncoder<W> {
 /// encoded in unary as 1110. Therefore, the Elias Gamma encoding of 9
 /// is 1110001.
 pub struct GammaDecoder<R: Read> {
-    reader: BitReader<R>
+    reader: BitReader<R>,
 }
 
 impl<R: Read> Decoder<R> for GammaDecoder<R> {
     fn new(reader: R) -> Self {
-        GammaDecoder { reader: BitReader::new(reader) }
+        GammaDecoder {
+            reader: BitReader::new(reader),
+        }
     }
 
     fn decode<T: Numeric>(self) -> Result<Vec<T>, InvalidCodeError> {

@@ -58,7 +58,6 @@ impl<W: Write> Encoder<W> for VBEncoder<W> {
     }
 }
 
-
 /// A structure that wraps a reader and decodes a sequence of integers
 /// using Variable Byte Encoding.
 ///

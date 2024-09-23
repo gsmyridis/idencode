@@ -2,8 +2,8 @@ pub mod global;
 
 use std::io::{self, Read, Write};
 
-use crate::num::Numeric;
 use crate::error::InvalidCodeError;
+use crate::num::Numeric;
 
 pub trait Encoder<W: Write> {
     /// Creates a new Encoder wrapping a writer.

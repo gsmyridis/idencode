@@ -1,5 +1,5 @@
-use crate::io::DEFAULT_BUF_SIZE;
 use crate::error::BitVecLengthError;
+use crate::io::DEFAULT_BUF_SIZE;
 
 pub struct BitVec {
     inner: Vec<u8>,
@@ -8,7 +8,6 @@ pub struct BitVec {
 }
 
 impl BitVec {
-
     /// Creates a new bit-vector with specified buffer of bytes and length of
     /// bit-vector.
     ///
@@ -37,7 +36,11 @@ impl BitVec {
         if (len > 8 * buf.len()) | (len < 8 * (buf.len() - 1)) {
             return Err(BitVecLengthError);
         }
-        Ok(BitVec { inner: buf, bit_pos: (len % 8) as u8, len})
+        Ok(BitVec {
+            inner: buf,
+            bit_pos: (len % 8) as u8,
+            len,
+        })
     }
 
     /// Constructs a new, empty `BitVec` with at least the specified capacity.
@@ -55,7 +58,7 @@ impl BitVec {
     /// # Panics
     ///
     /// Panics if the new capacity exceeds `isize::MAX` _bytes_.
-     ///
+    ///
     /// # Examples
     ///
     /// ```
@@ -69,9 +72,9 @@ impl BitVec {
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         BitVec {
-            inner: Vec::with_capacity((capacity + 7) / 8 ),
+            inner: Vec::with_capacity((capacity + 7) / 8),
             bit_pos: 0,
-            len: 0
+            len: 0,
         }
     }
 
@@ -104,7 +107,9 @@ impl BitVec {
         if self.bit_pos == 0 {
             self.inner.push(0)
         }
-        let byte = self.inner.last_mut()
+        let byte = self
+            .inner
+            .last_mut()
             .expect("It is guaranteed that at least one byte exists.");
         *byte |= (bit as u8) << 7 - self.bit_pos;
         self.bit_pos = (self.bit_pos + 1) % 8;
@@ -441,7 +446,7 @@ mod tests {
         assert_eq!(*bitvec.as_bytes(), [0b11111111, 0b11000000]);
 
         // Case 2 & 3
-        let bitvec = bitvec![true, true, false, true, false, ];
+        let bitvec = bitvec![true, true, false, true, false,];
         assert_eq!(*bitvec.as_bytes(), [0b11010000]);
     }
 

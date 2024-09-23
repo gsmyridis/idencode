@@ -2,11 +2,11 @@ mod convert;
 
 use std::fmt::Debug;
 use std::ops::{
-    BitAnd, BitOrAssign, BitXor, DivAssign, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign,
-    Sub, Mul, Add
+    Add, BitAnd, BitOrAssign, BitXor, DivAssign, Mul, Not, Rem, RemAssign, Shl, ShlAssign, Shr,
+    ShrAssign, Sub,
 };
 
-pub use convert::{bits_to_numeric};
+pub use convert::bits_to_numeric;
 
 /// This trait extends many common integer types (both unsigned and signed)
 /// with a few trivial methods so that they can be used
