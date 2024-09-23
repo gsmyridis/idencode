@@ -1,7 +1,7 @@
-# `idencode`
+# Integer Encoding-Decoding
 
-`idencode` is a Rust library designed to efficiently encode a stream of integers into bits. It currently supports the
-following encoding schemes:
+`idencode` is a Rust library designed to efficiently decode and encode a stream of integers into bits. It currently
+supports the following encoding schemes:
 - Unary
 - Variable Byte
 - Elias Gamma
