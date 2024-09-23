@@ -111,6 +111,69 @@ impl BitVec {
         self.len += 1;
     }
 
+    /// Pushes a whole byte to the underlying buffer of bytes.
+    ///
+    /// Note that if the current bit has not been filled, it will be padded with
+    /// 0-bits.
+    ///
+    /// ```
+    /// use idencode::{BitVec, bitvec};
+    ///
+    /// let mut bitvec = bitvec![true, true, false];
+    /// bitvec.push_byte(0b10000000);
+    /// assert_eq!(*bitvec.as_bytes(), [0b11000000, 0b10000000]);
+    /// ```
+    pub fn push_byte(&mut self, byte: u8) {
+        self.inner.push(byte);
+        self.bit_pos = 0;
+    }
+
+    /// Pushes whole bytes to the underlying buffer of bytes.
+    ///
+    /// Note that if the current bit has not been filled, it will be padded with
+    /// 0-bits.
+    ///
+    /// ```
+    /// use idencode::{BitVec, bitvec};
+    ///
+    /// let mut bitvec = bitvec![true, true, false];
+    /// bitvec.extend_from_byte_slice(&[0b10000000, 0b10000000]);
+    /// assert_eq!(*bitvec.as_bytes(), [0b11000000, 0b10000000, 0b10000000]);
+    /// ```
+    #[inline]
+    pub fn extend_from_byte_slice(&mut self, bytes: &[u8]) {
+        for byte in bytes {
+            self.inner.push(*byte);
+        }
+    }
+
+    /// Inserts an element at position `index` within the vector, shifting all
+    /// elements after it to the right.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `index > len`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use idencode::{BitVec, bitvec};
+    ///
+    /// let mut bitvec = bitvec![true, true, false, true];
+    /// bitvec.insert_byte(0, 0b10101010);
+    /// assert_eq!(*bitvec.as_bytes(), [0b10101010, 0b11010000]);
+    /// ```
+    ///
+    /// # Time complexity
+    ///
+    /// Takes *O*([`Vec::len`]) time. All items after the insertion index must be
+    /// shifted to the right. In the worst case, all elements are shifted when
+    /// the insertion index is 0.
+    #[inline]
+    pub fn insert_byte(&mut self, index: usize, byte: u8) {
+        self.inner.insert(index, byte)
+    }
+
     /// Extends bit-queue from a slice of bits.
     ///
     /// Traverses the slice of bits in-order and sequentially pushes the bits
@@ -294,6 +357,19 @@ impl BitVec {
     #[inline]
     pub fn as_bytes_mut(&mut self) -> &mut [u8] {
         self.inner.as_mut_slice()
+    }
+
+    /// Consumes the bit-vector returning the underlying buffer of bytes.
+    ///
+    /// ```
+    /// use idencode::{BitVec, bitvec};
+    ///
+    /// let bitvec = bitvec![true, true, false];
+    /// assert_eq!(bitvec.into_bytes(), vec![0b11000000]);
+    /// ```
+    #[inline]
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.inner
     }
 
     /// Converts the bit-vector to a vector of bits in boolean form.

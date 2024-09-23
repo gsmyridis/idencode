@@ -6,7 +6,7 @@ use crate::error::NoTerminatingBitError;
 use crate::BitVec;
 
 pub struct BitReader<R: Read> {
-    inner: R
+    inner: R,
 }
 
 impl<R: Read> BitReader<R> {
@@ -54,10 +54,12 @@ impl<R: Read> BitReader<R> {
                 // the last byte.
                 if pos == 7 {
                     buffer.pop();
+                } else {
+                    let byte = buffer.last_mut()
+                        .expect("The buffer is guaranteed to not be empty.");
+                    *byte &= !(1 << pos);
                 }
                 let len = (buffer.len() - 1) * 8 + (7 - pos) as usize;
-                let byte = buffer.last_mut().expect("The buffer is guaranteed to not be empty.");
-                *byte &= !(1 << pos);
                 Ok(BitVec::new(buffer, len)?)
             }
         }
@@ -89,6 +91,14 @@ mod tests {
         let reader = BitReader::new(reader);
         let bitvec = reader.read_to_end().unwrap();
         assert!(bitvec.is_empty());
+    }
+
+    #[test]
+    fn test_bitvec_read() {
+        let reader = Cursor::new(vec![0b10001100, 0b10000000]);
+        let reader = BitReader::new(reader);
+        let bitvec = reader.read_to_end().unwrap();
+        assert_eq!(*bitvec.as_bytes(), [0b10001100]);
     }
 
     #[test]

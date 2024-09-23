@@ -3,7 +3,7 @@ mod convert;
 use std::fmt::Debug;
 use std::ops::{
     BitAnd, BitOrAssign, BitXor, DivAssign, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign,
-    Sub,
+    Sub, Mul, Add
 };
 
 pub use convert::{bits_to_numeric};
@@ -28,7 +28,9 @@ pub trait Numeric:
     + BitOrAssign<Self>
     + BitXor<Self, Output = Self>
     + Not<Output = Self>
+    + Add<Self, Output = Self>
     + Sub<Self, Output = Self>
+    + Mul<Self, Output = Self>
     + From<u8>
 {
     /// Size of type in bits

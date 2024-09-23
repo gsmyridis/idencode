@@ -1,109 +1,107 @@
-use crate::error::InvalidVariableByteCode;
+use std::io::{self, Read, Write};
+
+use crate::code::{Decoder, Encoder};
+use crate::error::InvalidCodeError;
+use crate::io::read::BitReader;
+use crate::io::write::BitWriter;
 use crate::num::Numeric;
 
-pub struct VBEncoder;
+/// A structure that wraps a writer and encodes a sequence of integers
+/// using Variable Byte Encoding.
+///
+/// Variable byte (VB) encoding uses an integral number of bytes to encode
+/// an integer. The last 7 bits of a byte are “payload” and encode part of
+/// the integer. The first bit of the byte is a continuation bit. It is set
+/// to 1 for the last byte of the encoded gap and to 0 otherwise.
+pub struct VBEncoder<W: Write> {
+    writer: BitWriter<W>,
+}
 
-impl VBEncoder {
-    /// Encodes the
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use idencode::VBEncoder;
-    ///
-    /// assert_eq!(VBEncoder::encode::<u8>(&[5]), vec![0b10000101]);
-    /// assert_eq!(VBEncoder::encode::<u32>(&[824, 214577]), vec![0b00000110, 0b10111000, 0b00001101, 0b00001100, 0b10110001]);
-    /// ```
-    pub fn encode<T: Numeric>(nums: &[T]) -> Vec<u8> {
-        let mut encoded = vec![];
-        for n in nums {
-            let bytes = VBEncoder::encode_one(*n);
-            encoded.extend_from_slice(&bytes)
+impl<W: Write> Encoder<W> for VBEncoder<W> {
+    fn new(writer: W) -> Self {
+        VBEncoder {
+            writer: BitWriter::new(writer),
         }
-        encoded
     }
 
-    fn encode_one<T: Numeric>(mut n: T) -> Vec<u8> {
-        let mut bytes = vec![];
+    fn write<T: Numeric>(&mut self, nums: &[T]) -> io::Result<()> {
+        let encoded = self.writer.get_mut();
         let base = T::from(0x80_u8);
-        loop {
-            // Get the 7 bits of the lower byte.
-            let byte = (n % base).to_u8().expect("Guaranteed to be u8.");
-            bytes.insert(0, byte);
-            if n < base {
-                break;
+        let mut num_bytes = vec![];
+
+        for num in nums {
+            let mut num = num.to_owned();
+            num_bytes.clear();
+
+            loop {
+                // Get the 7 bits of the lowest byte.
+                let byte = (num % base).to_u8().expect("Guaranteed to be u8.");
+                num_bytes.insert(0, byte);
+                if num < base {
+                    break;
+                }
+                num /= base; // Keep the rest of the bytes.
             }
-            n /= base; // Keep the rest of the bytes.
+
+            *num_bytes // Add the termination bit for the last byte.
+                .last_mut()
+                .expect("bytes is guaranteed to not be empty.") += 0x80;
+
+            // Push them to the encoded buffer.
+            encoded.extend_from_byte_slice(num_bytes.as_slice());
         }
-        // Add the termination bit for the last byte.
-        *bytes
-            .last_mut()
-            .expect("bytes is guaranteed to not be empty.") |= 0x80;
-        bytes
+        Ok(())
+    }
+
+    fn finalize(self) -> io::Result<W> {
+        self.writer.finalize()
     }
 }
 
-pub struct VBDecoder;
 
-impl VBDecoder {
-    /// Decodes a series of bytes to a number with variable byte (VB) encoding.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use idencode::VBDecoder;
-    ///
-    /// assert_eq!(VBDecoder::decode_one(&[0b10000101]), Ok(5));
-    /// assert_eq!(VBDecoder::decode_one(&[0b00000110, 0b10111000]), Ok(824));
-    /// assert_eq!(VBDecoder::decode_one(&[0b00001101, 0b00001100, 0b10110001]), Ok(214577));
-    /// assert!(VBDecoder::decode_one(&[0b10000011, 0b10101000]).is_err());
-    /// ```
-    pub fn decode_one(bytes: &[u8]) -> Result<u32, InvalidVariableByteCode> {
-        if !VBDecoder::is_valid_code(bytes) {
-            return Err(InvalidVariableByteCode);
+/// A structure that wraps a reader and decodes a sequence of integers
+/// using Variable Byte Encoding.
+///
+/// Variable byte (VB) encoding uses an integral number of bytes to encode
+/// an integer. The last 7 bits of a byte are “payload” and encode part of
+/// the integer. The first bit of the byte is a continuation bit. It is set
+/// to 1 for the last byte of the encoded gap and to 0 otherwise.
+pub struct VBDecoder<R: Read> {
+    reader: BitReader<R>,
+}
+
+impl<R: Read> Decoder<R> for VBDecoder<R> {
+    fn new(reader: R) -> Self {
+        VBDecoder {
+            reader: BitReader::new(reader),
         }
-        let mut n = 0u32;
-        for byte in bytes {
-            if *byte < 0x80 {
-                n = 0x80 * n + (*byte as u32);
-            } else {
-                n = 0x80 * n + (*byte as u32) - 0x80;
-            }
-        }
-        Ok(n)
     }
 
-    /// Checks if the sequence of bytes represents a well formatted
-    /// variable byte code.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use idencode::VBDecoder;
-    ///
-    /// assert!(VBDecoder::is_valid_code(&[0b00110001, 0b10100110]));
-    /// assert!(!VBDecoder::is_valid_code(&[0b10110001, 0b10100110]));
-    /// assert!(!VBDecoder::is_valid_code(&[0b00110001, 0b00100110]));
-    /// assert!(!VBDecoder::is_valid_code(&[0b10001100, 0b00110101]));
-    /// ```
-    pub fn is_valid_code(bytes: &[u8]) -> bool {
-        // Count the bytes with termination bit, and keep the position of one.
-        // The valid code has only the last byte with a termination bit.
-        let mut n_term_bytes = 0u8;
-        let mut term_byte_idx = 0u8;
-        for (byte_idx, byte) in bytes.iter().enumerate() {
-            if *byte > 0x80 {
-                n_term_bytes += 1;
-                term_byte_idx = byte_idx as u8;
-            }
-            // If there are more than one byte with terminating bit,
-            // the code is invalid.
-            if n_term_bytes > 1 {
-                return false;
+    fn decode<T: Numeric>(self) -> Result<Vec<T>, InvalidCodeError> {
+        let mut nums = vec![];
+        let bitvec = self.reader.read_to_end().unwrap();
+        if bitvec.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let last_byte = *bitvec
+            .last_byte()
+            .expect("The bitvec is guaranteed to not be empty.");
+        if last_byte < 0x80_u8 {
+            return Err(InvalidCodeError);
+        };
+
+        let mut n = T::ZERO;
+        for byte in bitvec.into_bytes() {
+            n = T::from(0x80) * n + T::from(byte);
+            if byte > 128 {
+                n = n - T::from(0x80);
+                nums.push(n);
+                n = T::ZERO;
             }
         }
-        // If the number of bytes with terminating bytes
-        (n_term_bytes == 1) && (term_byte_idx == bytes.len() as u8 - 1)
+
+        Ok(nums)
     }
 }
 
@@ -111,17 +109,61 @@ impl VBDecoder {
 mod tests {
 
     use super::*;
+    use std::io::Cursor;
 
     #[test]
-    fn test_encode_one() {
-        assert_eq!(VBEncoder::encode_one::<u8>(5), vec![0b10000101]);
+    fn test_encode_decode_u8() {
+        let nums = vec![5, 10, 33];
+        let writer = Cursor::new(vec![]);
+        let mut vbe = VBEncoder::new(writer);
+        vbe.write::<u8>(nums.as_slice()).unwrap();
+        let encoded = vbe.finalize().unwrap();
+        let encoded = encoded.into_inner();
+        assert_eq!(encoded, &[0b10000101, 0b10001010, 0b10100001, 0b10000000]);
+
+        let vbd = VBDecoder::new(Cursor::new(encoded));
+        let decoded = vbd.decode::<u8>().unwrap();
+        assert_eq!(decoded, nums);
+    }
+
+    #[test]
+    fn test_encode_decode_u32() {
+        let nums = vec![824, 8];
+        let writer = Cursor::new(vec![]);
+        let mut vbe = VBEncoder::new(writer);
+        vbe.write::<u32>(nums.as_slice()).unwrap();
+        let encoded = vbe.finalize().unwrap();
+        let encoded = encoded.into_inner();
+        assert_eq!(encoded, &[0b000000110, 0b10111000, 0b10001000, 0b10000000]);
+
+        let vbd = VBDecoder::new(Cursor::new(encoded));
+        let decoded = vbd.decode::<u32>().unwrap();
+        assert_eq!(decoded, nums);
+    }
+
+    #[test]
+    fn test_encode_decode_u64() {
+        let nums = vec![214577, 824, 8];
+        let writer = Cursor::new(vec![]);
+        let mut vbe = VBEncoder::new(writer);
+        vbe.write::<u64>(nums.as_slice()).unwrap();
+        let encoded = vbe.finalize().unwrap();
+        let encoded = encoded.into_inner();
         assert_eq!(
-            VBEncoder::encode_one::<u32>(824),
-            vec![0b00000110, 0b10111000]
+            encoded,
+            vec![
+                0b00001101,
+                0b00001100,
+                0b10110001,
+                0b000000110,
+                0b10111000,
+                0b10001000,
+                0b10000000
+            ]
         );
-        assert_eq!(
-            VBEncoder::encode_one::<u64>(214577),
-            vec![0b00001101, 0b00001100, 0b10110001]
-        );
+
+        let vbd = VBDecoder::new(Cursor::new(encoded));
+        let decoded = vbd.decode::<u64>().unwrap();
+        assert_eq!(decoded, nums);
     }
 }

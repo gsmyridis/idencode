@@ -1,7 +1,5 @@
 use std::io::{self, Write};
 
-use anyhow::Context;
-
 use crate::collections::BitVec;
 use crate::io::DEFAULT_BUF_SIZE;
 
@@ -44,7 +42,7 @@ impl<W: Write> BitWriter<W> {
     ///     bw.write_bit(bit).unwrap();
     /// }
     ///
-    /// assert_eq!(*bw.get_ref(), [0b11000000]);
+    /// assert_eq!(*bw.get_ref().as_bytes(), [0b11000000]);
     /// ```
     pub fn write_bit(&mut self, bit: bool) -> io::Result<()> {
         self.buf.push(bit);
@@ -77,8 +75,8 @@ impl<W: Write> BitWriter<W> {
     ///
     /// Note that the buffer does not contain the byte that is currently
     /// written.
-    pub fn get_ref(&self) -> &[u8] {
-        self.buf.as_bytes()
+    pub fn get_ref(&self) -> &BitVec {
+        &self.buf
     }
 
     /// Acquires a mutable reference to the underlying writer.
@@ -87,8 +85,8 @@ impl<W: Write> BitWriter<W> {
     /// written. Also, note that this mutating the output/input state of
     /// the stream may corrupt this object, so care must be taken when
     /// using this method.
-    pub fn get_mut(&mut self) -> &mut [u8] {
-        self.buf.as_bytes_mut()
+    pub fn get_mut(&mut self) -> &mut BitVec {
+        &mut self.buf
     }
 
     /// Resets the state of this bit-writer entirely, cleaning the underlying
