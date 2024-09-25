@@ -8,6 +8,7 @@ pub use collections::BitVec;
 pub use io::read::BitReader;
 pub use io::write::BitWriter;
 
-pub use code::global::gamma::GammaEncoder;
+pub use code::{Encoder, Decoder};
+pub use code::global::gamma::{GammaEncoder, GammaDecoder};
 pub use code::global::unary::{UnaryDecoder, UnaryEncoder};
 pub use code::global::vb::{VBDecoder, VBEncoder};
