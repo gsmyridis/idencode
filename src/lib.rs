@@ -12,3 +12,10 @@ pub use code::{Encoder, Decoder};
 pub use code::global::gamma::{GammaEncoder, GammaDecoder};
 pub use code::global::unary::{UnaryDecoder, UnaryEncoder};
 pub use code::global::vb::{VBDecoder, VBEncoder};
+
+
+pub enum Encoding {
+    None,
+    Gamma,
+    VariableByte,
+}
