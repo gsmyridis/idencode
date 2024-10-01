@@ -6,20 +6,22 @@ use crate::io::DEFAULT_BUF_SIZE;
 /// This structure represents a bit-writer.
 pub struct BitWriter<W: ?Sized + Write> {
     buf: BitVec,
+    term_bit: bool,
     inner: W,
 }
 
 impl<W: Write> BitWriter<W> {
     /// Creates a new `BufWriter<W>` with a default buffer capacity.
-    pub fn new(inner: W) -> BitWriter<W> {
-        BitWriter::with_capacity(DEFAULT_BUF_SIZE, inner)
+    pub fn new(inner: W, term_bit: bool) -> BitWriter<W> {
+        BitWriter::with_capacity(DEFAULT_BUF_SIZE, inner, term_bit)
     }
 
     /// Creates a new `BitWriter<W>` with at least the specified buffer capacity.
-    pub fn with_capacity(capacity: usize, inner: W) -> BitWriter<W> {
+    pub fn with_capacity(capacity: usize, inner: W, term_bit: bool) -> BitWriter<W> {
         BitWriter {
             inner,
             buf: BitVec::with_capacity(capacity),
+            term_bit
         }
     }
 
@@ -36,7 +38,7 @@ impl<W: Write> BitWriter<W> {
     /// use idencode::BitWriter;
     ///
     /// let writer = Cursor::new(vec![]);
-    /// let mut bw = BitWriter::new(writer);
+    /// let mut bw = BitWriter::new(writer, true);
     /// let bits = vec![true, true, false];
     /// for bit in bits {
     ///     bw.write_bit(bit).unwrap();
@@ -58,7 +60,7 @@ impl<W: Write> BitWriter<W> {
     /// use idencode::BitWriter;
     ///
     /// let writer = Cursor::new(vec![]);
-    /// let mut bw = BitWriter::new(writer);
+    /// let mut bw = BitWriter::new(writer, true);
     /// bw.write_bits(&[true, true, false, true, false, false, false, false]).unwrap();
     ///
     /// let result = bw.finalize().unwrap().into_inner();
@@ -114,7 +116,7 @@ impl<W: Write> BitWriter<W> {
     /// use idencode::BitWriter;
     ///
     /// let writer = Cursor::new(vec![]);
-    /// let mut bw = BitWriter::new(writer);
+    /// let mut bw = BitWriter::new(writer, true);
     /// bw.write_bit(true).unwrap();
     /// bw.write_bit(false).unwrap();
     /// let result = bw.finalize().unwrap();
@@ -124,8 +126,9 @@ impl<W: Write> BitWriter<W> {
         if self.buf.is_empty() {
             return Ok(self.inner);
         }
-
-        self.buf.push(true); // Add the terminating bit.
+        if self.term_bit {
+            self.buf.push(true); // Add the terminating bit.
+        }
         self.inner.write_all(self.buf.as_bytes())?;
         self.inner.flush()?;
         Ok(self.inner)
@@ -140,7 +143,7 @@ mod tests {
     #[test]
     fn test_push_bits() {
         let writer = Cursor::new(vec![]);
-        let mut bw = BitWriter::new(writer);
+        let mut bw = BitWriter::new(writer, true);
         let bits = vec![
             false, false, false, false, false, false, true, true, false, false, false, false,
             false, false, false, true,

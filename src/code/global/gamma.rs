@@ -26,7 +26,7 @@ pub struct GammaEncoder<W: Write> {
 impl<W: Write> Encoder<W> for GammaEncoder<W> {
     fn new(writer: W) -> Self {
         GammaEncoder {
-            writer: BitWriter::new(writer),
+            writer: BitWriter::new(writer, true),
         }
     }
 
@@ -93,7 +93,7 @@ pub struct GammaDecoder<R: Read> {
 impl<R: Read> Decoder<R> for GammaDecoder<R> {
     fn new(reader: R) -> Self {
         GammaDecoder {
-            reader: BitReader::new(reader),
+            reader: BitReader::new(reader, true),
         }
     }
 

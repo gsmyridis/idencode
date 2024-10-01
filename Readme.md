@@ -28,7 +28,7 @@ purposes.
 `BitWriter` wraps around a Write and allows writing a stream of bits. Internally, it uses a BitVec as a buffer, which
 is then written to the Write instance when finalized.
 
-Important Note: When finalizing the writing process, an additional terminating bit (1) is appended to signal the end
+If specified with `term_bit = true`, when finalizing the writing process, an additional terminating bit (1) is appended to signal the end
 of the bitstream. This is essential because computers store data in whole bytes, not individual bits. For example,
 if you write three bits (`true`, `true`, `false`), you’ll have `0b11000000` in the byte. However, when reading this
 back, there's no way to tell how many bits were originally written without a terminating marker. Therefore, `BitWriter`
@@ -38,7 +38,9 @@ can be omitted.
 
 ### `BitReader`
 `BitReader` wraps a `Read` and reads a stream of bits from it, storing the result in a `BitVec`. The BitVec is
-returned, making it easy to retrieve and interpret the bits.
+returned, making it easy to retrieve and interpret the bits. Similar to `BitWriter`, if the `BitReader` is instantiated
+with `term_bit = true`, the reader will look for the last, terminating bit; otherwise, it will read a multiple of 8
+number of bits (all the bits in the bytes).
 
 ### `Encode` and `Decode`
 The `Encode` and `Decode` traits are implemented by various encoders and decoders. These traits define the behavior

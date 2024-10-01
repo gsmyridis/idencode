@@ -5,14 +5,15 @@ use anyhow::anyhow;
 use crate::error::NoTerminatingBitError;
 use crate::BitVec;
 
-pub struct BitReader<R: Read> {
+pub struct BitReader<R: ?Sized + Read> {
+    term_bit: bool,
     inner: R,
 }
 
 impl<R: Read> BitReader<R> {
     /// Creates a new `BitReader` from a reader.
-    pub fn new(reader: R) -> Self {
-        BitReader { inner: reader }
+    pub fn new(reader: R, term_bit: bool) -> Self {
+        BitReader { inner: reader, term_bit }
     }
 
     /// Reads all the bits from the underlying reader.
@@ -27,7 +28,7 @@ impl<R: Read> BitReader<R> {
     /// use std::io::Cursor;
     ///
     /// let reader = Cursor::new(vec![0b10101011, 0b11001000]);
-    /// let mut reader = BitReader::new(reader);
+    /// let mut reader = BitReader::new(reader, true);
     /// let bitvec = reader.read_to_end().unwrap();
     /// assert_eq!(bitvec.len(), 12);
     /// assert_eq!(*bitvec.bit_position(), 4);
@@ -42,30 +43,11 @@ impl<R: Read> BitReader<R> {
             return Ok(BitVec::default());
         }
 
-        // Find the terminating bit, and return a BitVec with the appropriate
-        // buffer, and length.
-        let &byte = buffer
-            .last()
-            .expect("The buffer is guaranteed to not be empty.");
-        let term_bit_pos = trailing_one_pos(byte);
-        return match term_bit_pos {
-            None => Err(anyhow!(NoTerminatingBitError)),
-            Some(pos) => {
-                // Set the terminating bit to 0. Calculate the bitvec length.
-                // If the position of the terminating bit is 7, then we discard
-                // the last byte.
-                if pos == 7 {
-                    buffer.pop();
-                } else {
-                    let byte = buffer
-                        .last_mut()
-                        .expect("The buffer is guaranteed to not be empty.");
-                    *byte &= !(1 << pos);
-                }
-                let len = (buffer.len() - 1) * 8 + (7 - pos) as usize;
-                Ok(BitVec::new(buffer, len)?)
-            }
-        };
+        if self.term_bit {
+            with_terminating_bit(buffer)
+        } else {
+            Ok(BitVec::new(buffer))
+        }
     }
 }
 
@@ -80,6 +62,34 @@ fn trailing_one_pos(byte: u8) -> Option<u8> {
     None // No 1-bit found
 }
 
+// Converts a buffer into a `BitVec`, removing the terminating bit.
+//
+// Searches for the terminating bit and returns an error if not found.
+// If the terminating bit is at position 7, the last byte is removed;
+// otherwise, the bit is cleared (set to 0). The resulting `BitVec`
+// is then truncated to the correct length and returned.
+fn with_terminating_bit(mut buffer: Vec<u8>) -> anyhow::Result<BitVec> {
+    let &byte = buffer
+        .last()
+        .expect("The buffer is guaranteed to not be empty.");
+    let term_bit_pos = trailing_one_pos(byte);
+    return match term_bit_pos {
+        None => Err(anyhow!(NoTerminatingBitError)),
+        Some(pos) => {
+            if pos == 7 {
+                buffer.pop();
+            } else {
+                let byte = buffer
+                    .last_mut()
+                    .expect("The buffer is guaranteed to not be empty.");
+                *byte &= !(1 << pos);
+            }
+            let len = (buffer.len() - 1) * 8 + (7 - pos) as usize;
+            return Ok(BitVec::with_len(buffer, len)?)
+        }
+    };
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -89,7 +99,7 @@ mod tests {
     #[test]
     fn test_empty_bitvec() {
         let reader = Cursor::new(Vec::<u8>::new());
-        let reader = BitReader::new(reader);
+        let reader = BitReader::new(reader, true);
         let bitvec = reader.read_to_end().unwrap();
         assert!(bitvec.is_empty());
     }
@@ -97,7 +107,7 @@ mod tests {
     #[test]
     fn test_bitvec_read() {
         let reader = Cursor::new(vec![0b10001100, 0b10000000]);
-        let reader = BitReader::new(reader);
+        let reader = BitReader::new(reader, true);
         let bitvec = reader.read_to_end().unwrap();
         assert_eq!(*bitvec.as_bytes(), [0b10001100]);
     }

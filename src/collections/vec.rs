@@ -8,6 +8,7 @@ pub struct BitVec {
 }
 
 impl BitVec {
+
     /// Creates a new bit-vector with specified buffer of bytes and length of
     /// bit-vector.
     ///
@@ -24,15 +25,15 @@ impl BitVec {
     /// ```
     /// use idencode::BitVec;
     ///
-    /// let bitvec = BitVec::new(vec![0b10011001, 0b10001000], 14).unwrap();
+    /// let bitvec = BitVec::with_len(vec![0b10011001, 0b10001000], 14).unwrap();
     /// assert_eq!(*bitvec.as_bytes(), [0b10011001, 0b10001000]);
     /// assert_eq!(bitvec.len(), 14);
     /// assert_eq!(*bitvec.bit_position(), 6);
     ///
-    /// assert!(BitVec::new(vec![1, 2, 3], 15).is_err());
-    /// assert!(BitVec::new(vec![1, 2, 3], 25).is_err());
+    /// assert!(BitVec::with_len(vec![1, 2, 3], 15).is_err());
+    /// assert!(BitVec::with_len(vec![1, 2, 3], 25).is_err());
     /// ```
-    pub fn new(buf: Vec<u8>, len: usize) -> Result<Self, BitVecLengthError> {
+    pub fn with_len(buf: Vec<u8>, len: usize) -> Result<Self, BitVecLengthError> {
         if (len > 8 * buf.len()) | (len < 8 * (buf.len() - 1)) {
             return Err(BitVecLengthError);
         }
@@ -41,6 +42,13 @@ impl BitVec {
             bit_pos: (len % 8) as u8,
             len,
         })
+    }
+
+    /// Constructs a new `BitVec` from a buffer of bits. The number of bits
+    /// is a multiple of 8.
+    pub fn new(buffer: Vec<u8>) -> Self {
+        let len = buffer.len() * 8;
+        BitVec { inner: buffer, bit_pos: 0, len }
     }
 
     /// Constructs a new, empty `BitVec` with at least the specified capacity.

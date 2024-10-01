@@ -20,7 +20,7 @@ pub struct VBEncoder<W: Write> {
 impl<W: Write> Encoder<W> for VBEncoder<W> {
     fn new(writer: W) -> Self {
         VBEncoder {
-            writer: BitWriter::new(writer),
+            writer: BitWriter::new(writer, false),
         }
     }
 
@@ -72,7 +72,7 @@ pub struct VBDecoder<R: Read> {
 impl<R: Read> Decoder<R> for VBDecoder<R> {
     fn new(reader: R) -> Self {
         VBDecoder {
-            reader: BitReader::new(reader),
+            reader: BitReader::new(reader, false),
         }
     }
 
@@ -118,7 +118,7 @@ mod tests {
         vbe.write::<u8>(nums.as_slice()).unwrap();
         let encoded = vbe.finalize().unwrap();
         let encoded = encoded.into_inner();
-        assert_eq!(encoded, &[0b10000101, 0b10001010, 0b10100001, 0b10000000]);
+        assert_eq!(encoded, &[0b10000101, 0b10001010, 0b10100001]);
 
         let vbd = VBDecoder::new(Cursor::new(encoded));
         let decoded = vbd.decode::<u8>().unwrap();
@@ -133,7 +133,7 @@ mod tests {
         vbe.write::<u32>(nums.as_slice()).unwrap();
         let encoded = vbe.finalize().unwrap();
         let encoded = encoded.into_inner();
-        assert_eq!(encoded, &[0b000000110, 0b10111000, 0b10001000, 0b10000000]);
+        assert_eq!(encoded, &[0b000000110, 0b10111000, 0b10001000]);
 
         let vbd = VBDecoder::new(Cursor::new(encoded));
         let decoded = vbd.decode::<u32>().unwrap();
@@ -157,7 +157,6 @@ mod tests {
                 0b000000110,
                 0b10111000,
                 0b10001000,
-                0b10000000
             ]
         );
 
