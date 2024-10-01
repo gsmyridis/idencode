@@ -4,7 +4,7 @@ use crate::collections::BitVec;
 use crate::io::DEFAULT_BUF_SIZE;
 
 /// This structure represents a bit-writer.
-pub struct BitWriter<W: ?Sized + Write> {
+pub struct BitWriter<W> {
     buf: BitVec,
     term_bit: bool,
     inner: W,

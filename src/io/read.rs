@@ -5,7 +5,7 @@ use anyhow::anyhow;
 use crate::error::NoTerminatingBitError;
 use crate::BitVec;
 
-pub struct BitReader<R: ?Sized + Read> {
+pub struct BitReader<R> {
     term_bit: bool,
     inner: R,
 }

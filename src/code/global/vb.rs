@@ -24,7 +24,7 @@ impl<W: Write> Encoder<W> for VBEncoder<W> {
         }
     }
 
-    fn write<T: Numeric>(&mut self, nums: &[T]) -> io::Result<()> {
+    fn encode<T: Numeric>(&mut self, nums: &[T]) -> io::Result<()> {
         let encoded = self.writer.get_mut();
         let base = T::from(0x80_u8);
         let mut num_bytes = vec![];
@@ -87,7 +87,7 @@ impl<R: Read> Decoder<R> for VBDecoder<R> {
             .last_byte()
             .expect("The bitvec is guaranteed to not be empty.");
         if last_byte < 0x80_u8 {
-            return Err(InvalidCodeError);
+            return Err(InvalidCodeError::VBCodeError);
         };
 
         let mut n = T::ZERO;
@@ -115,7 +115,7 @@ mod tests {
         let nums = vec![5, 10, 33];
         let writer = Cursor::new(vec![]);
         let mut vbe = VBEncoder::new(writer);
-        vbe.write::<u8>(nums.as_slice()).unwrap();
+        vbe.encode::<u8>(nums.as_slice()).unwrap();
         let encoded = vbe.finalize().unwrap();
         let encoded = encoded.into_inner();
         assert_eq!(encoded, &[0b10000101, 0b10001010, 0b10100001]);
@@ -130,7 +130,7 @@ mod tests {
         let nums = vec![824, 8];
         let writer = Cursor::new(vec![]);
         let mut vbe = VBEncoder::new(writer);
-        vbe.write::<u32>(nums.as_slice()).unwrap();
+        vbe.encode::<u32>(nums.as_slice()).unwrap();
         let encoded = vbe.finalize().unwrap();
         let encoded = encoded.into_inner();
         assert_eq!(encoded, &[0b000000110, 0b10111000, 0b10001000]);
@@ -145,7 +145,7 @@ mod tests {
         let nums = vec![214577, 824, 8];
         let writer = Cursor::new(vec![]);
         let mut vbe = VBEncoder::new(writer);
-        vbe.write::<u64>(nums.as_slice()).unwrap();
+        vbe.encode::<u64>(nums.as_slice()).unwrap();
         let encoded = vbe.finalize().unwrap();
         let encoded = encoded.into_inner();
         assert_eq!(

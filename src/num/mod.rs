@@ -1,4 +1,4 @@
-mod convert;
+pub mod convert;
 
 use std::fmt::Debug;
 use std::ops::{
@@ -54,6 +54,9 @@ pub trait Numeric:
     /// Assuming 0 <= value < 256, returns this value as a `u8` type
     fn to_u8(self) -> Option<u8>;
 
+    /// Tries to cast self to usize.
+    fn to_usize(self) -> Option<usize>;
+
     /// Counts the number of leading zeros
     fn leading_zeros(self) -> u32;
 }
@@ -74,6 +77,16 @@ macro_rules! define_numeric {
                     Some(self as u8)
                 }
             }
+
+            #[inline(always)]
+            fn to_usize(self) -> Option<usize> {
+                if self > usize::MAX as $t {
+                    None
+                } else {
+                    Some(self as usize)
+                }
+            }
+
             #[inline(always)]
             fn leading_zeros(self) -> u32 {
                 <$t>::leading_zeros(self)
@@ -86,4 +99,4 @@ define_numeric!(u8);
 define_numeric!(u16);
 define_numeric!(u32);
 define_numeric!(u64);
-define_numeric!(u128);
+define_numeric!(usize);

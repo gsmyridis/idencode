@@ -1,10 +1,11 @@
 use std::io::{self, Read, Write};
 
 use super::unary::{UnaryDecoder, UnaryEncoder};
-use crate::code::{Decoder, Encoder};
+use crate::code::{DecodeOne, Decoder, EncodeOne, Encoder};
 use crate::error::InvalidCodeError;
 use crate::io::read::BitReader;
 use crate::io::write::BitWriter;
+use crate::num::convert::write_offset_bits;
 use crate::num::{bits_to_numeric, Numeric};
 
 /// A structure that wraps a writer and encodes a sequence of integers
@@ -19,50 +20,33 @@ use crate::num::{bits_to_numeric, Numeric};
 /// remaining digits (001), and the length of these offset bits (3) is
 /// encoded in unary as 1110. Therefore, the Elias Gamma encoding of 9
 /// is 1110001.
-pub struct GammaEncoder<W: Write> {
+pub struct GammaEncoder<W> {
     writer: BitWriter<W>,
+}
+
+impl EncodeOne for GammaEncoder<()> {
+    fn encode_one<T: Numeric>(num: T) -> Vec<bool> {
+        let mut offset_bits = vec![];
+        write_offset_bits(&num, &mut offset_bits);
+        let mut bits = UnaryEncoder::encode_one(offset_bits.len());
+        bits.append(&mut offset_bits);
+        bits
+    }
 }
 
 impl<W: Write> Encoder<W> for GammaEncoder<W> {
     fn new(writer: W) -> Self {
-        GammaEncoder {
-            writer: BitWriter::new(writer, true),
-        }
+        let writer = BitWriter::new(writer, true);
+        GammaEncoder { writer }
     }
 
-    fn write<T>(&mut self, nums: &[T]) -> io::Result<()>
-    where
-        T: Numeric,
-    {
-        // We reuse a single vector to store the offset bits for each number in `nums`.
-        // For each number, we clear the vector, calculate the offset bits, and store
-        // them in the vector. This approach avoids redundant heap allocations by reusing
-        // the same vector instead of creating a new one for each number.
+    fn encode<T: Numeric>(&mut self, nums: &[T]) -> io::Result<()> {
         let mut offset_bits = Vec::new();
 
         for n in nums {
             offset_bits.clear();
-
-            // Calculate the offset bits.
-            // We need to find all the bits of the number's binary representation
-            // except the leading 1 bit. The way to do this is to extract each bit
-            // starting from the most significant bit (after the leading one).
-            let leading_one_idx = T::BITS - n.leading_zeros() - 1;
-            for i in 0..leading_one_idx {
-                let shift = leading_one_idx - i - 1;
-                let base = T::ONE << shift;
-                if (*n & base).is_zero() {
-                    offset_bits.push(false);
-                } else {
-                    offset_bits.push(true);
-                }
-            }
-
-            // Encode length of offset bits in unary code.
-            let len = offset_bits.len();
-            let len_bits = UnaryEncoder::encode(len);
-
-            // Write length and offset bits in bit-writer.
+            write_offset_bits(n, &mut offset_bits);
+            let len_bits = UnaryEncoder::encode_one(offset_bits.len());
             self.writer.write_bits(&len_bits)?;
             self.writer.write_bits(&offset_bits)?;
         }
@@ -86,8 +70,33 @@ impl<W: Write> Encoder<W> for GammaEncoder<W> {
 /// remaining digits (001), and the length of these offset bits (3) is
 /// encoded in unary as 1110. Therefore, the Elias Gamma encoding of 9
 /// is 1110001.
-pub struct GammaDecoder<R: Read> {
+pub struct GammaDecoder<R> {
     reader: BitReader<R>,
+}
+
+impl DecodeOne for GammaDecoder<()> {
+    fn decode_one<T: Numeric>(bits: &[bool]) -> Result<T, InvalidCodeError> {
+        let idx = bits
+            .iter()
+            .position(|b| !b)
+            .ok_or_else(|| InvalidCodeError::GammaCodeError)?;
+
+        let (len_bits, rest) = bits.split_at(idx + 1);
+        let len = UnaryDecoder::decode_one(len_bits)?;
+
+        if rest.len() != len {
+            return Err(InvalidCodeError::GammaCodeError);
+        }
+
+        let mut n_bits = Vec::with_capacity(len);
+        n_bits.push(true);
+        n_bits.extend_from_slice(&rest[..len]);
+
+        match bits_to_numeric(n_bits.as_slice()) {
+            Ok(num) => Ok(num),
+            _ => Err(InvalidCodeError::GammaCodeError),
+        }
+    }
 }
 
 impl<R: Read> Decoder<R> for GammaDecoder<R> {
@@ -104,29 +113,28 @@ impl<R: Read> Decoder<R> for GammaDecoder<R> {
         let mut bits = bits.as_slice();
 
         while !bits.is_empty() {
-            // Find the first zero (false) bit from the left in bits.
-            match bits.iter().position(|b| !b) {
-                Some(idx) => {
-                    let (len_bits, rest) = bits.split_at(idx + 1);
-                    let len = UnaryDecoder::decode(len_bits)?;
+            let idx = bits
+                .iter()
+                .position(|b| !b)
+                .ok_or_else(|| InvalidCodeError::GammaCodeError)?;
 
-                    if rest.len() < len {
-                        return Err(InvalidCodeError);
-                    }
+            let (len_bits, rest) = bits.split_at(idx + 1);
+            let len = UnaryDecoder::decode_one(len_bits)?;
 
-                    let mut n_bits = Vec::with_capacity(len);
-                    n_bits.push(true);
-                    n_bits.extend_from_slice(&rest[..len]);
-                    let numeric = bits_to_numeric(n_bits.as_slice()).unwrap();
-                    nums.push(numeric);
+            if rest.len() < len {
+                return Err(InvalidCodeError::GammaCodeError);
+            }
 
-                    if let Some((_, r)) = rest.split_at_checked(len) {
-                        bits = r;
-                    } else {
-                        break;
-                    }
-                }
-                None => return Err(InvalidCodeError),
+            let mut n_bits = Vec::with_capacity(len);
+            n_bits.push(true);
+            n_bits.extend_from_slice(&rest[..len]);
+            let numeric = bits_to_numeric(n_bits.as_slice()).unwrap();
+            nums.push(numeric);
+
+            if let Some((_, r)) = rest.split_at_checked(len) {
+                bits = r;
+            } else {
+                return Err(InvalidCodeError::GammaCodeError);
             }
         }
         Ok(nums)
@@ -140,34 +148,20 @@ mod tests {
 
     #[test]
     fn test_encode_1() {
-        // Example 1
-        let writer = Cursor::new(vec![]);
-        let mut ge = GammaEncoder::new(writer);
-        ge.write(&[0b10_u32]).unwrap();
-        let result = ge.finalize().unwrap().into_inner();
-        assert_eq!(result, vec![0b10010000]);
-
-        // Example 2
-        let writer = Cursor::new(vec![]);
-        let mut ge = GammaEncoder::new(writer);
-        ge.write(&[0b11_u32]).unwrap();
-        let result = ge.finalize().unwrap().into_inner();
-        assert_eq!(result, vec![0b10110000]);
-
-        // Example 3
-        let writer = Cursor::new(vec![]);
-        let mut ge = GammaEncoder::new(writer);
-        ge.write(&[9_u32]).unwrap();
-        let result = ge.finalize().unwrap().into_inner();
-        assert_eq!(result, vec![0b11100011]);
+        assert_eq!(GammaEncoder::encode_one(0b10_u32), vec![true, false, false]);
+        assert_eq!(GammaEncoder::encode_one(0b11_u32), vec![true, false, true]);
+        assert_eq!(
+            GammaEncoder::encode_one(9_u32),
+            vec![true, true, true, false, false, false, true]
+        );
     }
 
     #[test]
-    fn test_encode_2() {
+    fn test_encode_decode() {
         // Example 1
         let writer = Cursor::new(vec![]);
         let mut ge = GammaEncoder::new(writer);
-        ge.write(&[2_u32, 3]).unwrap();
+        ge.encode(&[2_u32, 3]).unwrap();
         let result = ge.finalize().unwrap().into_inner();
         assert_eq!(result, vec![0b10010110]);
 
@@ -178,12 +172,23 @@ mod tests {
         // Example 2
         let writer = Cursor::new(vec![]);
         let mut ge = GammaEncoder::new(writer);
-        ge.write(&[2_u32, 3, 9]).unwrap();
+        ge.encode(&[2_u32, 3, 9]).unwrap();
         let result = ge.finalize().unwrap().into_inner();
         assert_eq!(result, vec![0b10010111, 0b10001100]);
 
         let de = GammaDecoder::new(Cursor::new(result));
         let nums = de.decode::<u32>().unwrap();
         assert_eq!(nums, vec![2, 3, 9]);
+    }
+
+    #[test]
+    fn test_decode_errs() {
+        let reader = Cursor::new(vec![0b10010111, 0b11100110]);
+        let de = GammaDecoder::new(reader);
+        assert!(de.decode::<u8>().is_err());
+
+        let reader = Cursor::new(vec![0b11111111]);
+        let de = GammaDecoder::new(reader);
+        assert!(de.decode::<u8>().is_err());
     }
 }

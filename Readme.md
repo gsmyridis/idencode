@@ -2,9 +2,9 @@
 
 `idencode` is a Rust library designed to efficiently decode and encode a stream of integers into bits. It currently
 supports the following encoding schemes:
-- Unary
-- Variable Byte
-- Elias Gamma
+- Unary (`UnaryEncoder`, `UnaryDecoder`)
+- Variable Byte (`VBEncoder`, `VBDecoder`)
+- Elias Gamma (`GammaEncoder`, `GammaDecoder`)
  
 Additional encoding schemes are planned for future releases, and the library's infrastructure is designed to simplify 
 the process of adding them. The primary purpose of creating the library was to learn about the encodings and the

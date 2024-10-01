@@ -15,12 +15,12 @@ impl UnaryEncoder {
     /// ```
     /// use idencode::UnaryEncoder;
     ///
-    /// assert_eq!(UnaryEncoder::encode(0), vec![false]);
-    /// assert_eq!(UnaryEncoder::encode(1), vec![true, false]);
-    /// assert_eq!(UnaryEncoder::encode(2), vec![true, true, false]);
-    /// assert_eq!(UnaryEncoder::encode(3), vec![true, true, true, false]);
+    /// assert_eq!(UnaryEncoder::encode_one(0), vec![false]);
+    /// assert_eq!(UnaryEncoder::encode_one(1), vec![true, false]);
+    /// assert_eq!(UnaryEncoder::encode_one(2), vec![true, true, false]);
+    /// assert_eq!(UnaryEncoder::encode_one(3), vec![true, true, true, false]);
     /// ```
-    pub fn encode(n: usize) -> Vec<bool> {
+    pub fn encode_one(n: usize) -> Vec<bool> {
         let mut bits = Vec::with_capacity(n + 1);
         bits.extend(vec![true; n]);
         bits.push(false);
@@ -43,22 +43,22 @@ impl UnaryDecoder {
     /// ```
     /// use idencode::UnaryDecoder;
     ///
-    /// assert_eq!(UnaryDecoder::decode(&[false]), Ok(0));
-    /// assert_eq!(UnaryDecoder::decode(&[true, false]), Ok(1));
-    /// assert_eq!(UnaryDecoder::decode(&[true, true, false]), Ok(2));
-    /// assert!(UnaryDecoder::decode(&[true, true]).is_err());
-    /// assert!(UnaryDecoder::decode(&[true, false, true]).is_err());
+    /// assert_eq!(UnaryDecoder::decode_one(&[false]), Ok(0));
+    /// assert_eq!(UnaryDecoder::decode_one(&[true, false]), Ok(1));
+    /// assert_eq!(UnaryDecoder::decode_one(&[true, true, false]), Ok(2));
+    /// assert!(UnaryDecoder::decode_one(&[true, true]).is_err());
+    /// assert!(UnaryDecoder::decode_one(&[true, false, true]).is_err());
     /// ```
-    pub fn decode(code: &[bool]) -> Result<usize, InvalidCodeError> {
+    pub fn decode_one(code: &[bool]) -> Result<usize, InvalidCodeError> {
         // Check if the code is terminated by '0'.
         if code.last() != Some(&false) {
-            return Err(InvalidCodeError);
+            return Err(InvalidCodeError::UnaryCodeError);
         }
 
         // Check if the rest of the characters are '1's.
         for c in code[..code.len() - 1].iter() {
             if !(*c) {
-                return Err(InvalidCodeError);
+                return Err(InvalidCodeError::UnaryCodeError);
             }
         }
 

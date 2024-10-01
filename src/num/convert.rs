@@ -22,6 +22,24 @@ pub fn bits_to_numeric<T: Numeric>(bits: &[bool]) -> Result<T, OverflowError> {
     Ok(result)
 }
 
+/// Calculate the offset bits.
+///
+/// We need to find all the bits of the number's binary representation
+/// except the leading 1 bit. The way to do this is to extract each bit
+/// starting from the most significant bit (after the leading one).
+pub(crate) fn write_offset_bits<T: Numeric>(num: &T, buffer: &mut Vec<bool>) {
+    let leading_one_idx = T::BITS - num.leading_zeros() - 1;
+    for i in 0..leading_one_idx {
+        let shift = leading_one_idx - i - 1;
+        let base = T::ONE << shift;
+        if (*num & base).is_zero() {
+            buffer.push(false);
+        } else {
+            buffer.push(true);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
