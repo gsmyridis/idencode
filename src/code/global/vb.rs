@@ -13,17 +13,18 @@ use crate::num::Numeric;
 /// an integer. The last 7 bits of a byte are “payload” and encode part of
 /// the integer. The first bit of the byte is a continuation bit. It is set
 /// to 1 for the last byte of the encoded gap and to 0 otherwise.
-pub struct VBEncoder<W: Write> {
+pub struct VBEncoder<W> {
     writer: BitWriter<W>,
 }
 
-impl<W: Write> Encoder<W> for VBEncoder<W> {
-    fn new(writer: W) -> Self {
-        VBEncoder {
-            writer: BitWriter::new(writer, false),
-        }
+impl<W: Write> VBEncoder<W> {
+    pub fn new(writer: W) -> Self {
+        let writer = BitWriter::new(writer, false);
+        VBEncoder { writer }
     }
+}
 
+impl<W: Write> Encoder<W> for VBEncoder<W> {
     fn encode<T: Numeric>(&mut self, nums: &[T]) -> io::Result<()> {
         let encoded = self.writer.get_mut();
         let base = T::from(0x80_u8);
@@ -65,17 +66,18 @@ impl<W: Write> Encoder<W> for VBEncoder<W> {
 /// an integer. The last 7 bits of a byte are “payload” and encode part of
 /// the integer. The first bit of the byte is a continuation bit. It is set
 /// to 1 for the last byte of the encoded gap and to 0 otherwise.
-pub struct VBDecoder<R: Read> {
+pub struct VBDecoder<R> {
     reader: BitReader<R>,
 }
 
-impl<R: Read> Decoder<R> for VBDecoder<R> {
-    fn new(reader: R) -> Self {
-        VBDecoder {
-            reader: BitReader::new(reader, false),
-        }
+impl<R: Read> VBDecoder<R> {
+    pub fn new(reader: R) -> Self {
+        let reader = BitReader::new(reader, false);
+        VBDecoder { reader }
     }
+}
 
+impl<R: Read> Decoder<R> for VBDecoder<R> {
     fn decode<T: Numeric>(self) -> Result<Vec<T>, InvalidCodeError> {
         let mut nums = vec![];
         let bitvec = self.reader.read_to_end().unwrap();

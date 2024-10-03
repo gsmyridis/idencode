@@ -1,6 +1,7 @@
 use crate::error::BitVecLengthError;
 use crate::io::DEFAULT_BUF_SIZE;
 
+#[derive(Debug, Clone)]
 pub struct BitVec {
     inner: Vec<u8>,
     bit_pos: u8,
@@ -8,7 +9,6 @@ pub struct BitVec {
 }
 
 impl BitVec {
-
     /// Creates a new bit-vector with specified buffer of bytes and length of
     /// bit-vector.
     ///
@@ -48,7 +48,11 @@ impl BitVec {
     /// is a multiple of 8.
     pub fn new(buffer: Vec<u8>) -> Self {
         let len = buffer.len() * 8;
-        BitVec { inner: buffer, bit_pos: 0, len }
+        BitVec {
+            inner: buffer,
+            bit_pos: 0,
+            len,
+        }
     }
 
     /// Constructs a new, empty `BitVec` with at least the specified capacity.

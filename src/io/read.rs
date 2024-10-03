@@ -13,7 +13,10 @@ pub struct BitReader<R> {
 impl<R: Read> BitReader<R> {
     /// Creates a new `BitReader` from a reader.
     pub fn new(reader: R, term_bit: bool) -> Self {
-        BitReader { inner: reader, term_bit }
+        BitReader {
+            inner: reader,
+            term_bit,
+        }
     }
 
     /// Reads all the bits from the underlying reader.
@@ -85,7 +88,7 @@ fn with_terminating_bit(mut buffer: Vec<u8>) -> anyhow::Result<BitVec> {
                 *byte &= !(1 << pos);
             }
             let len = (buffer.len() - 1) * 8 + (7 - pos) as usize;
-            return Ok(BitVec::with_len(buffer, len)?)
+            return Ok(BitVec::with_len(buffer, len)?);
         }
     };
 }

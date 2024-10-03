@@ -24,6 +24,13 @@ pub struct GammaEncoder<W> {
     writer: BitWriter<W>,
 }
 
+impl<W: Write> GammaEncoder<W> {
+    pub fn new(writer: W) -> Self {
+        let writer = BitWriter::new(writer, true);
+        GammaEncoder { writer }
+    }
+}
+
 impl EncodeOne for GammaEncoder<()> {
     fn encode_one<T: Numeric>(num: T) -> Vec<bool> {
         let mut offset_bits = vec![];
@@ -35,11 +42,6 @@ impl EncodeOne for GammaEncoder<()> {
 }
 
 impl<W: Write> Encoder<W> for GammaEncoder<W> {
-    fn new(writer: W) -> Self {
-        let writer = BitWriter::new(writer, true);
-        GammaEncoder { writer }
-    }
-
     fn encode<T: Numeric>(&mut self, nums: &[T]) -> io::Result<()> {
         let mut offset_bits = Vec::new();
 
@@ -74,6 +76,13 @@ pub struct GammaDecoder<R> {
     reader: BitReader<R>,
 }
 
+impl<R: Read> GammaDecoder<R> {
+    pub fn new(reader: R) -> Self {
+        let reader = BitReader::new(reader, true);
+        GammaDecoder { reader }
+    }
+}
+
 impl DecodeOne for GammaDecoder<()> {
     fn decode_one<T: Numeric>(bits: &[bool]) -> Result<T, InvalidCodeError> {
         let idx = bits
@@ -100,12 +109,6 @@ impl DecodeOne for GammaDecoder<()> {
 }
 
 impl<R: Read> Decoder<R> for GammaDecoder<R> {
-    fn new(reader: R) -> Self {
-        GammaDecoder {
-            reader: BitReader::new(reader, true),
-        }
-    }
-
     fn decode<T: Numeric>(self) -> Result<Vec<T>, InvalidCodeError> {
         let mut nums = vec![];
         let bitvec = self.reader.read_to_end().expect("Failed to read reader.");
