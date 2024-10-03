@@ -5,6 +5,7 @@ supports the following encoding schemes:
 - Unary (`UnaryEncoder`, `UnaryDecoder`)
 - Variable Byte (`VBEncoder`, `VBDecoder`)
 - Elias Gamma (`GammaEncoder`, `GammaDecoder`)
+- Elias Delta (`DeltaEncoder`, `DeltaDecoder`)
  
 Additional encoding schemes are planned for future releases, and the library's infrastructure is designed to simplify 
 the process of adding them. The primary purpose of creating the library was to learn about the encodings and the
@@ -16,13 +17,15 @@ The library’s core components are:
 - `BitVec`
 - `BitWriter`
 - `BitReader`
-- Traits: `Encode`, `Decode`, and `Numeric`
+- Traits: `Encode`, `EncodeOne`, `Decode`, `DecodeOne`, and `Numeric`
 
 ### `BitVec`
 `BitVec` is the fundamental structure that stores individual bits. Bits are stored using bit-endian byte order and
 most-significant-bit first bit order, effectively treating the BitVec as a standard vector of bits. While future
 enhancements may introduce options for custom byte or bit orderings, the current design is sufficient for encoding
-purposes.
+purposes. 
+
+Additionally, there is a `bitvec!` macro, that works like `vec!`, for quick creation of `BitVec`s.
 
 ### `BitWriter`
 `BitWriter` wraps around a Write and allows writing a stream of bits. Internally, it uses a BitVec as a buffer, which
@@ -42,18 +45,23 @@ returned, making it easy to retrieve and interpret the bits. Similar to `BitWrit
 with `term_bit = true`, the reader will look for the last, terminating bit; otherwise, it will read a multiple of 8
 number of bits (all the bits in the bytes).
 
-### `Encode` and `Decode`
+### `Encode`, `EncodeOne` and `Decode`, `DecodeOne`
 The `Encode` and `Decode` traits are implemented by various encoders and decoders. These traits define the behavior
-for serializing and deserializing integers to and from a bitstream.
+for serializing and deserializing integers to a `Write` and from a `Read`. On the other hand, `EncodeOne`, and 
+`DecodeOne`, encode and decode only a single number into a `Vec<bool>` and from `&[bool]`.
 
 ### `Numeric`
 `Numeric` is a custom trait implemented by all unsigned integer types that can be encoded and decoded by the library. 
 This abstraction allows flexibility in applying encoding and decoding strategies to different numeric types.
 
+
 ## Planned Features
 `idencode` is not under active development, but will likely improve in the future. Specifically:
 
+- Refactor for maintainability
 - Improvement of API
-- Support for additional encoding schemes
-- Enhanced customization for byte and bit orderings
 - Performance optimizations
+- Better error handling (remove `anyhow`)
+- Improve documentation
+- Support for additional encoding schemes
+- Enhanced customization for byte and bit orderings (`BitQueue`)

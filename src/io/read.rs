@@ -81,14 +81,16 @@ fn with_terminating_bit(mut buffer: Vec<u8>) -> anyhow::Result<BitVec> {
         Some(pos) => {
             if pos == 7 {
                 buffer.pop();
+                let len = buffer.len() * 8;
+                Ok(BitVec::with_len(buffer, len)?)
             } else {
                 let byte = buffer
                     .last_mut()
                     .expect("The buffer is guaranteed to not be empty.");
                 *byte &= !(1 << pos);
+                let len = (buffer.len() - 1) * 8 + (7 - pos) as usize;
+                Ok(BitVec::with_len(buffer, len)?)
             }
-            let len = (buffer.len() - 1) * 8 + (7 - pos) as usize;
-            return Ok(BitVec::with_len(buffer, len)?);
         }
     };
 }
@@ -97,6 +99,7 @@ fn with_terminating_bit(mut buffer: Vec<u8>) -> anyhow::Result<BitVec> {
 mod tests {
 
     use super::*;
+    use crate::{bitvec, BitVec};
     use std::io::Cursor;
 
     #[test]
@@ -120,5 +123,17 @@ mod tests {
         assert_eq!(trailing_one_pos(0), None);
         assert_eq!(trailing_one_pos(0b10010000), Some(4));
         assert_eq!(trailing_one_pos(0b10000000), Some(7));
+    }
+
+    #[test]
+    fn test_with_terminating_bit() {
+        let bv = bitvec![true, false, false];
+        assert_eq!(with_terminating_bit(vec![0b10010000]).unwrap(), bv);
+
+        let bv = bitvec![true, false, true, true, false, false, false, true];
+        assert_eq!(
+            with_terminating_bit(vec![0b10110001, 0b10000000]).unwrap(),
+            bv
+        );
     }
 }

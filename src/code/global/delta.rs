@@ -1,4 +1,4 @@
-use std::io::{self, Cursor, Write};
+use std::io::{self, Read, Write};
 
 use crate::error::InvalidCodeError;
 use crate::num::convert::write_offset_bits;
@@ -23,6 +23,13 @@ pub struct DeltaEncoder<W> {
     writer: BitWriter<W>,
 }
 
+impl<W: Write> DeltaEncoder<W> {
+    pub fn new(writer: W) -> Self {
+        let writer = BitWriter::new(writer, true);
+        DeltaEncoder { writer }
+    }
+}
+
 impl EncodeOne for DeltaEncoder<()> {
     fn encode_one<T: Numeric>(num: T) -> Vec<bool> {
         let mut offset_bits = vec![];
@@ -34,12 +41,6 @@ impl EncodeOne for DeltaEncoder<()> {
 }
 
 impl<W: Write> Encoder<W> for DeltaEncoder<W> {
-    fn new(writer: W) -> Self {
-        DeltaEncoder {
-            writer: BitWriter::new(writer, true),
-        }
-    }
-
     fn encode<T: Numeric>(&mut self, nums: &[T]) -> io::Result<()> {
         let mut offset_bits = Vec::new();
 
@@ -74,6 +75,13 @@ pub struct DeltaDecoder<R> {
     reader: BitReader<R>,
 }
 
+impl<R: Read> DeltaDecoder<R> {
+    pub fn new(reader: R) -> Self {
+        let reader = BitReader::new(reader, true);
+        DeltaDecoder { reader }
+    }
+}
+
 impl DecodeOne for DeltaDecoder<()> {
     fn decode_one<T: Numeric>(bits: &[bool]) -> Result<T, InvalidCodeError> {
         let idx = bits
@@ -83,7 +91,10 @@ impl DecodeOne for DeltaDecoder<()> {
 
         let (lb_len_bits, rest) = bits.split_at(idx + 1);
         let len_len_bits = UnaryDecoder::decode_one(&lb_len_bits)?;
-        let (offset_len_bits, offset_bits) = rest.split_at(len_len_bits);
+
+        let (offset_len_bits, offset_bits) = rest
+            .split_at_checked(len_len_bits)
+            .ok_or(InvalidCodeError::DeltaCodeError)?;
 
         let mut len_bits = Vec::with_capacity(lb_len_bits.len() + offset_len_bits.len());
         len_bits.extend_from_slice(lb_len_bits);
@@ -101,48 +112,50 @@ impl DecodeOne for DeltaDecoder<()> {
     }
 }
 
-// impl<R: Read> Decoder<R> for DeltaDecoder<R> {
-//     fn new(reader: R) -> Self {
-//         DeltaDecoder {
-//             reader: BitReader::new(reader, true),
-//         }
-//     }
-//
-//     fn decode<T: Numeric>(self) -> Result<Vec<T>, InvalidCodeError> {
-//         let mut nums = vec![];
-//         let bitvec = self.reader.read_to_end().expect("Failed to read reader.");
-//         let bits = bitvec.into_bits();
-//         let mut bits = bits.as_ slice();
-//
-//         while !bits.is_empty() {
-//             let idx = bits
-//                 .iter()
-//                 .position(|b| !b)
-//                 .ok_or_else(|| InvalidCodeError::DeltaCodeError)?;
-//
-//             let (lb_len_bits, rest) = bits.split_at(idx + 1);
-//             let len_len_bits = UnaryDecoder::decode_one(&lb_len_bits)?;
-//             let (offset_len_bits, rest) = rest.split_at(len_len_bits);
-//
-//             let mut len_bits = Vec::with_capacity(lb_len_bits.len() + offset_len_bits.len());
-//             len_bits.extend_from_slice(lb_len_bits);
-//             len_bits.extend_from_slice(offset_len_bits);
-//             let len = GammaDecoder::decode_one::<usize>(&len_bits)? - 1;
-//
-//             if offset_bits.len() != len {
-//                 return Err(InvalidCodeError::DeltaCodeError);
-//             }
-//
-//             let mut bits = Vec::with_capacity(len);
-//             bits.push(true);
-//             bits.extend_from_slice(offset_bits);
-//             let num =
-//                 bits_to_numeric::<T>(&bits).or_else(|_| Err(InvalidCodeError::DeltaCodeError))?;
-//             nums.push(num);
-//         }
-//         Ok(nums)
-//     }
-// }
+impl<R: Read> Decoder<R> for DeltaDecoder<R> {
+    fn decode<T: Numeric>(self) -> Result<Vec<T>, InvalidCodeError> {
+        let mut nums = vec![];
+        let bitvec = self.reader.read_to_end().expect("Failed to read reader.");
+        let bits = bitvec.into_bits();
+        let mut current_bits = bits.as_slice();
+
+        while !current_bits.is_empty() {
+            let idx = current_bits
+                .iter()
+                .position(|b| !b)
+                .ok_or(InvalidCodeError::DeltaCodeError)?;
+            let (unary_bits, rest) = current_bits.split_at(idx + 1);
+
+            let length_of_binary = UnaryDecoder::decode_one(&unary_bits)?;
+            if rest.len() < length_of_binary {
+                return Err(InvalidCodeError::DeltaCodeError);
+            }
+
+            let (binary_bits, rest) = rest.split_at(length_of_binary);
+            let mut length_bits = Vec::with_capacity(unary_bits.len() + binary_bits.len());
+            length_bits.extend_from_slice(unary_bits);
+            length_bits.extend_from_slice(binary_bits);
+            let value_length = GammaDecoder::decode_one::<usize>(&length_bits)? - 1;
+
+            if rest.len() < value_length {
+                return Err(InvalidCodeError::DeltaCodeError);
+            }
+
+            let (value_bits, remaining) = rest.split_at(value_length);
+
+            let mut final_bits = Vec::with_capacity(value_length + 1);
+            final_bits.push(true);
+            final_bits.extend_from_slice(value_bits);
+
+            let num =
+                bits_to_numeric::<T>(&final_bits).map_err(|_| InvalidCodeError::DeltaCodeError)?;
+
+            nums.push(num);
+            current_bits = remaining;
+        }
+        Ok(nums)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -182,7 +195,13 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_2() {
+    fn test_decode_one_errs() {
+        assert!(DeltaDecoder::decode_one::<u8>(&[true, false]).is_err());
+        assert!(DeltaDecoder::decode_one::<u8>(&[true, false, false]).is_err());
+    }
+
+    #[test]
+    fn test_encode_decode() {
         // Example 1
         let writer = Cursor::new(vec![]);
         let mut ge = DeltaEncoder::new(writer);
@@ -190,9 +209,9 @@ mod tests {
         let result = ge.finalize().unwrap().into_inner();
         assert_eq!(result, vec![0b10001001, 0b10000000]);
 
-        //let de = DeltaEncoder::new(Cursor::new(result));
-        //let nums = de.decode::<u32>().unwrap();
-        //assert_eq!(nums, vec![2, 3]);
+        let de = DeltaDecoder::new(Cursor::new(result));
+        let nums = de.decode::<u32>().unwrap();
+        assert_eq!(nums, vec![2, 3]);
 
         // Example 2
         let writer = Cursor::new(vec![]);
@@ -201,8 +220,8 @@ mod tests {
         let result = ge.finalize().unwrap().into_inner();
         assert_eq!(result, vec![0b10001001, 0b11000001, 0b10000000]);
 
-        //let de = GammaDecoder::new(Cursor::new(result));
-        //let nums = de.decode::<u32>().unwrap();
-        //assert_eq!(nums, vec![2, 3, 9]);
+        let de = DeltaDecoder::new(Cursor::new(result));
+        let nums = de.decode::<u32>().unwrap();
+        assert_eq!(nums, vec![2, 3, 9]);
     }
 }

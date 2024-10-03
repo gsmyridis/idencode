@@ -1,7 +1,7 @@
 use crate::error::BitVecLengthError;
 use crate::io::DEFAULT_BUF_SIZE;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BitVec {
     inner: Vec<u8>,
     bit_pos: u8,
